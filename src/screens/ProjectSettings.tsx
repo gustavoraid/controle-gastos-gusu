@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 import { computeNets, suggestTransfers } from "@/lib/balances";
 import { formatBRL } from "@/lib/money";
-import { weightsToPercents } from "@/lib/split";
+import { parseWeight, percentLabels } from "@/lib/split";
 import type { Category, Member, Project } from "@/lib/types";
 
 export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
@@ -83,20 +83,25 @@ function ProjectInfo({ project }: { project: Project }) {
   );
 }
 
-function Proportions({ projectId, members, me }: { projectId: string; members: Member[]; me: string }) {
-  const [pct, setPct] = useState(() => weightsToPercents(members));
-  const sum = pct.reduce((a, b) => a + b, 0);
-  const original = weightsToPercents(members);
-  const dirty = pct.some((p, i) => p !== original[i]);
+const PRESETS: [number, number][] = [
+  [1, 1],
+  [3, 2],
+  [2, 1],
+  [7, 3],
+  [2, 3],
+  [1, 2],
+];
 
-  function setAt(i: number, value: number) {
-    const v = Math.max(0, Math.min(100, Math.round(value) || 0));
-    if (members.length === 2) setPct(i === 0 ? [v, 100 - v] : [100 - v, v]);
-    else setPct(pct.map((p, k) => (k === i ? v : p)));
-  }
+function Proportions({ projectId, members, me }: { projectId: string; members: Member[]; me: string }) {
+  const fmt = (w: number) => String(w).replace(".", ",");
+  const [inputs, setInputs] = useState(() => members.map((m) => fmt(m.weight)));
+  const parsed = inputs.map(parseWeight);
+  const valid = parsed.every((w) => w !== null) && parsed.some((w) => (w ?? 0) > 0);
+  const next = members.map((m, i) => ({ userId: m.userId, weight: parsed[i] ?? 0 }));
+  const labels = percentLabels(next);
+  const dirty = next.some((n, i) => n.weight !== members[i].weight);
 
   async function save() {
-    const next = members.map((m, i) => ({ userId: m.userId, weight: pct[i] }));
     try {
       // Mudar a proporção recalcula todas as despesas, inclusive as já acertadas:
       // mostra o saldo antes/depois para ninguém ser pego de surpresa.
@@ -126,38 +131,39 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Proporção da divisão</h2>
-      <p className="muted small">Toda despesa deste projeto é dividida assim. Mudar aqui recalcula também as despesas já lançadas (e o saldo).</p>
-      {members.length === 2 && (
-        <input type="range" min={0} max={100} step={5} value={pct[0]} onChange={(e) => setAt(0, Number(e.target.value))} aria-label={`Parte de ${members[0].name}`} className="slider" />
-      )}
+      <p className="muted small">
+        Pesos livres: 1 e 2 significa que um assume um terço e o outro dois terços. Mudar aqui recalcula também as
+        despesas já lançadas (e o saldo).
+      </p>
       {members.map((m, i) => (
         <label key={m.userId} className="row between">
           <span className="row gap-sm">
             <Avatar name={m.name} size={28} /> {m.userId === me ? `${m.name} (você)` : m.name}
           </span>
           <span className="row gap-sm">
-            <input className="pct-input" type="number" inputMode="numeric" min={0} max={100} value={pct[i]} onChange={(e) => setAt(i, Number(e.target.value))} />%
+            <input
+              className="pct-input"
+              inputMode="decimal"
+              value={inputs[i]}
+              onChange={(e) => setInputs(inputs.map((v, k) => (k === i ? e.target.value.replace(/[^\d.,]/g, "") : v)))}
+              aria-label={`Peso de ${m.name}`}
+            />
+            <span className="muted pct-label">{valid ? labels[i] : "—"}</span>
           </span>
         </label>
       ))}
-      <div className="chips">
-        {[
-          [50, 50],
-          [60, 40],
-          [70, 30],
-          [40, 60],
-          [30, 70],
-        ]
-          .filter(() => members.length === 2)
-          .map(([a, b]) => (
-            <button key={a} type="button" className="chip" onClick={() => setPct([a, b])}>
-              {a}/{b}
+      {members.length === 2 && (
+        <div className="chips">
+          {PRESETS.map(([a, b]) => (
+            <button key={`${a}-${b}`} type="button" className="chip" onClick={() => setInputs([fmt(a), fmt(b)])}>
+              {a} : {b}
             </button>
           ))}
-      </div>
-      {sum !== 100 && <p className="text-err small">Soma {sum}% — precisa dar 100%.</p>}
+        </div>
+      )}
+      {!valid && <p className="text-err small">Use números (pode ter vírgula) e pelo menos um peso maior que zero.</p>}
       {dirty && (
-        <button className="btn primary" onClick={save} disabled={sum !== 100}>
+        <button className="btn primary" onClick={save} disabled={!valid}>
           Salvar proporção
         </button>
       )}

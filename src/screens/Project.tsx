@@ -7,7 +7,7 @@ import { deleteSettlement, listMonth } from "@/lib/api";
 import { expenseImpact, suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
-import { expenseShares, weightsToPercents } from "@/lib/split";
+import { expenseShares, percentLabels } from "@/lib/split";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 
@@ -53,15 +53,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
     <>
       <Header title={`${project.emoji} ${project.name}`} onBack={() => back("/")} action={settingsBtn} />
       <main className="page with-fab">
-        {members.length < 2 && (
-          <section className="invite-card">
-            <p>
-              <strong>Falta a segunda conta.</strong> Quando a outra pessoa criar a conta dela no app, ela entra
-              automaticamente em todos os projetos.
-            </p>
-          </section>
-        )}
-
         <BalanceBanner me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
 
         <nav className="month-nav">
@@ -116,7 +107,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
   const { me, members, balances } = props;
   const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
   const mine = suggestTransfers(balances).filter((t) => t.from === me || t.to === me);
-  const pct = weightsToPercents(members);
+  const pct = percentLabels(members);
 
   return (
     <section className="balance-banner">
@@ -139,7 +130,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
       )}
       <div className="row between">
         <span className="muted small">
-          Divisão padrão: {members.map((m, i) => `${m.name} ${pct[i]}%`).join(" · ")}
+          Divisão padrão: {members.map((m, i) => `${m.name} ${pct[i]}`).join(" · ")}
         </span>
         {mine.length > 0 && (
           <button className="btn small ghost" onClick={props.onSettle}>

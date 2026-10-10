@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { expenseShares, splitByWeights, splitTotal, weightsToPercents } from "./split";
+import {
+  expenseShares,
+  parseWeight,
+  percentLabels,
+  splitByWeights,
+  splitTotal,
+} from "./split";
 
 const casal = [
   { userId: "ana", weight: 60 },
@@ -52,13 +58,6 @@ describe("splitByWeights", () => {
   });
 });
 
-describe("weightsToPercents", () => {
-  it("normaliza pesos arbitrários para 100", () => {
-    expect(weightsToPercents([{ userId: "a", weight: 1 }, { userId: "b", weight: 2 }])).toEqual([33, 67]);
-    expect(weightsToPercents(casal)).toEqual([60, 40]);
-  });
-});
-
 describe("expenseShares", () => {
   it("usa a proporção do projeto", () => {
     expect(expenseShares(9000, casal)).toEqual([
@@ -82,5 +81,35 @@ describe("expenseShares", () => {
     for (const total of [1, 7, 99, 12345]) {
       expect(splitTotal(expenseShares(total, [{ userId: "a", weight: 33 }, { userId: "b", weight: 67 }]))).toBe(total);
     }
+  });
+});
+
+describe("pesos livres", () => {
+  const umDois = [
+    { userId: "ana", weight: 1 },
+    { userId: "beto", weight: 2 },
+  ];
+
+  it("1 e 2 divide pela razão exata (1/3 e 2/3), não por 33%/67%", () => {
+    expect(splitByWeights(100000, umDois).map((l) => l.amountCents)).toEqual([33333, 66667]);
+  });
+
+  it("rótulos com uma casa decimal", () => {
+    expect(percentLabels(umDois)).toEqual(["33,3%", "66,7%"]);
+    expect(percentLabels([{ userId: "a", weight: 60 }, { userId: "b", weight: 40 }])).toEqual(["60%", "40%"]);
+    expect(percentLabels([{ userId: "a", weight: 0 }, { userId: "b", weight: 0 }])).toEqual(["50%", "50%"]);
+  });
+
+  it.each([
+    ["2", 2],
+    ["1,5", 1.5],
+    ["0.25", 0.25],
+    [" 60 ", 60],
+  ])("lê peso %j", (input, value) => {
+    expect(parseWeight(input)).toBe(value);
+  });
+
+  it.each(["", "-1", "abc", "1,2,3"])("rejeita peso %j", (input) => {
+    expect(parseWeight(input)).toBeNull();
   });
 });

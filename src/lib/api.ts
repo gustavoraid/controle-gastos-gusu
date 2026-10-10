@@ -18,12 +18,11 @@ function check<T>(res: { data: T | null; error: { message: string } | null }): T
 
 function translateError(msg: string): string {
   if (msg.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if (msg.includes("User already registered")) return "Esse e-mail já tem conta. Entre com a senha.";
-  if (msg.includes("Password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
   if (msg.includes("Email not confirmed")) return "Confirme o e-mail antes de entrar.";
   if (msg.includes("category_suggestions_category_id_text_key")) return "Essa sugestão já existe.";
-  if (msg.includes("Database error saving new user"))
-    return "Este app já tem as duas contas. Entre com seu e-mail e senha.";
+  if (msg.includes("expenses_category_id_fkey"))
+    return "Essa categoria tem despesas. Use “Ocultar do lançamento” em vez de excluir.";
+  if (msg.includes("crie as duas contas")) return "Crie as duas contas no Supabase antes do primeiro projeto.";
   return msg;
 }
 
@@ -76,13 +75,6 @@ const mapSettlement = (r: any): Settlement => ({
 export async function signIn(email: string, password: string) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(translateError(error.message));
-}
-
-export async function signUp(email: string, password: string, displayName: string) {
-  const data = check(
-    await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName } } }),
-  );
-  return { needsConfirmation: !data.session };
 }
 
 export async function signOut() {
@@ -239,7 +231,7 @@ export async function saveExpense(input: {
   description: string;
   amountCents: number;
   paidBy: string;
-  categoryId: string | null;
+  categoryId: string;
   spentOn: string;
 }) {
   const row = {

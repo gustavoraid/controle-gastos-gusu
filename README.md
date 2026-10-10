@@ -2,13 +2,14 @@
 
 App de celular (PWA) para controlar e dividir gastos a dois, no estilo Splitwise.
 
-- **Projetos** separados (Casa, Viagem…), cada um com a **proporção de divisão** própria (ex.: 60/40),
+- **Projetos** separados (Casa, Viagem…), cada um com a **proporção de divisão** própria em pesos
+  livres (1 e 2, 60 e 40…),
   aplicada a todas as despesas do projeto — mudar a proporção recalcula todas, inclusive as antigas.
 - **Categorias por projeto** com **descrições sugeridas** (Luz, Água, Feira, Aluguel…). Projeto novo
   começa com uma base padrão de casa ou **copia outro projeto** (pessoas, proporção, categorias e
   sugestões).
 - **Lançamento rápido**: valor → categoria → toque numa sugestão → salvar. "Quem pagou" já vem como
-  você e a data como hoje. Descrição é obrigatória.
+  você e a data como hoje. Categoria e descrição são obrigatórias.
 - **Saldo** ("Fulana te deve R$ X") e **acerto de contas** (registro do Pix).
 - **Resumo do mês**: total, quanto cada um pagou e assumiu, gasto por categoria.
 - **Tempo real**: o que um lança aparece no celular do outro.
@@ -19,10 +20,22 @@ Stack: Vite + React 19 + TypeScript + Supabase (Postgres, Auth, Realtime). Sem s
 ## 1. Criar o banco (Supabase, grátis)
 
 1. Crie um projeto em <https://supabase.com> (região São Paulo).
-2. **SQL Editor** → rode, em ordem, cada arquivo de `supabase/migrations/` (`0001_…`, `0002_…`, `0003_…`).
-3. **Authentication → Sign In / Providers → Email**: desligue **Confirm email** (são só duas contas
-   conhecidas, e o link de confirmação abre no navegador, não no app instalado).
-4. **Project Settings → API**: copie a `Project URL` e a chave `anon public`.
+2. **Authentication → Sign In / Providers**: desligue **Allow new users to sign up** (as contas são
+   criadas só por você, no painel) e **Confirm email**.
+3. **Authentication → Users → Add user → Create new user**: crie as **duas** contas (e-mail e senha),
+   marcando **Auto Confirm User**.
+4. **SQL Editor**: rode `supabase/migrations/0001_init.sql`.
+5. Ainda no SQL Editor, dê nome às duas pessoas (sem isso aparece o começo do e-mail):
+
+   ```sql
+   update profiles set display_name = 'Gustavo' where id = (select id from auth.users where email = 'seu@email.com');
+   update profiles set display_name = 'Nome dela' where id = (select id from auth.users where email = 'dela@email.com');
+   ```
+
+   > Se rodar o passo 4 antes do 3, sem problema: os perfis são criados quando as contas forem
+   > criadas. O que o banco não deixa é criar projeto antes de existirem as duas contas.
+
+6. **Project Settings → API**: copie a `Project URL` e a chave `anon public`.
 
 ## 2. Rodar localmente
 
@@ -50,20 +63,16 @@ Recomendado: **Cloudflare Pages**, **Vercel** ou **Netlify** ligados a este repo
 - **iPhone (Safari)**: abra o link → Compartilhar → **Adicionar à Tela de Início**.
 - **Android (Chrome)**: abra o link → menu ⋮ → **Instalar app**.
 
-Depois: cada um cria a sua conta no app (o banco aceita **no máximo duas**). Todo projeto já nasce
-com vocês dois; quem criar a conta depois entra automaticamente nos projetos existentes. Ajuste a
-proporção em **Ajustes do projeto**.
-
-Depois que as duas contas existirem, desligue também **Authentication → Sign In / Providers →
-Allow new users to sign up** no Supabase (o limite de duas já está no banco; isso é uma segunda trava).
+Depois cada um entra com o e-mail e a senha criados no painel. Todo projeto já nasce com vocês
+dois. Ajuste a proporção em **Ajustes do projeto**.
 
 ## Como a divisão funciona
 
-- A proporção é **do projeto** (`project_members.weight`): não há divisão por despesa e nada é
-  gravado por despesa. A parte de cada um é sempre calculada com a proporção atual.
+- A proporção é **do projeto** (`project_members.weight`), em pesos livres: 1 e 2 dá exatamente um
+  terço e dois terços (a tela só mostra "33,3% / 66,7%"). Não há divisão por despesa e nada é
+  gravado por despesa: a parte de cada um é calculada na leitura com a proporção atual.
 - Por isso **mudar a proporção recalcula todas as despesas e o saldo**, inclusive o que já foi
   acertado. Antes de salvar, o app mostra o saldo antes/depois e pede confirmação.
-- Quem entra no projeto depois passa a dividir também as despesas lançadas antes.
 - Centavos ímpares vão para quem tem o maior resto (nada some, nada sobra) — `src/lib/split.ts`.
 - Saldo = pagou − parte que lhe cabe + acertos enviados − acertos recebidos, calculado no banco
   (`project_balances`).

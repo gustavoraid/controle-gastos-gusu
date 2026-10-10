@@ -6,7 +6,7 @@ import { back } from "@/hooks/useRoute";
 import { deleteExpense, getExpense, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
-import { expenseShares, weightsToPercents } from "@/lib/split";
+import { expenseShares, percentLabels } from "@/lib/split";
 import type { Category, Expense, Member } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
@@ -59,20 +59,21 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
   const desc = description.trim();
   const lines = cents ? expenseShares(cents, members) : [];
   const category = categories.find((c) => c.id === categoryId);
-  const pct = weightsToPercents(members);
+  const pct = percentLabels(members);
   const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const today = todayISO();
   const yesterday = addDaysISO(today, -1);
 
   function pickCategory(id: string) {
     // Descrição que veio de sugestão da categoria anterior não faz sentido na nova.
-    if (category?.suggestions.some((sg) => sg.text === desc)) setDescription("");
-    setCategoryId(categoryId === id ? null : id);
+    if (id !== categoryId && category?.suggestions.some((sg) => sg.text === desc)) setDescription("");
+    setCategoryId(id);
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!cents) return toast.err("Digite um valor válido.");
+    if (!categoryId) return toast.err("Escolha uma categoria.");
     if (!desc) {
       descRef.current?.focus();
       return toast.err("Escreva uma descrição.");
@@ -206,13 +207,13 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
 
         {members.length > 1 && (
           <p className="muted small split-preview">
-            Divisão do projeto ({pct.join("/")})
+            Divisão do projeto ({pct.join(" / ")})
             {cents ? `: ${lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" · ")}` : ""}
           </p>
         )}
 
         <div className="sticky-actions">
-          <button className="btn primary big" disabled={busy || !cents || !desc}>
+          <button className="btn primary big" disabled={busy || !cents || !categoryId || !desc}>
             {busy ? "Salvando…" : existing ? "Salvar alterações" : cents ? `Lançar ${formatBRL(cents)}` : "Lançar"}
           </button>
         </div>

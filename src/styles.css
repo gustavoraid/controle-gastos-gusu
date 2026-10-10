@@ -394,8 +394,7 @@ select:focus {
 
 .card,
 .total-card,
-.balance-banner,
-.invite-card {
+.balance-banner {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 16px;
@@ -409,12 +408,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.invite-card {
-  background: var(--brand-soft);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 .balance-banner {
   display: flex;
@@ -726,6 +719,11 @@ select:focus {
 .pct-input {
   width: 5rem !important;
   text-align: right;
+}
+.pct-label {
+  width: 3.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .emoji-select {
   width: 4.5rem !important;

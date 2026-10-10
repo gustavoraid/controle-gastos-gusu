@@ -32,9 +32,23 @@ export function splitByWeights(totalCents: number, shares: Share[]): SplitLine[]
   return lines;
 }
 
-/** Pesos → porcentagens inteiras que somam 100 (para exibir "60% / 40%"). */
-export function weightsToPercents(shares: Share[]): number[] {
-  return splitByWeights(100, shares).map((l) => l.amountCents);
+const pctFmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+
+/**
+ * Pesos → rótulos de porcentagem para exibir ("33,3%", "66,7%"). Pesos são
+ * livres (1 e 2, 60 e 40, 3 e 2…): o cálculo usa a razão exata, nunca o
+ * percentual arredondado — este é só para mostrar.
+ */
+export function percentLabels(shares: Share[]): string[] {
+  const sum = shares.reduce((acc, s) => acc + Math.max(0, s.weight), 0);
+  return shares.map((s) => `${pctFmt.format(sum > 0 ? (Math.max(0, s.weight) / sum) * 100 : 100 / shares.length)}%`);
+}
+
+/** "2", "1,5", "0.5" → número; inválido ou negativo → null. */
+export function parseWeight(input: string): number | null {
+  const s = input.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,4})?$/.test(s)) return null;
+  return Number(s);
 }
 
 /**

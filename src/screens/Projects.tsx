@@ -89,7 +89,7 @@ function ProjectRow({ p, me }: { p: ProjectSummary; me: string }) {
         <span className="grow">
           <strong>{p.name}</strong>
           <span className="muted small row gap-sm">
-            {others.length === 0 ? "Falta a segunda conta" : others.map((m) => <Avatar key={m.userId} name={m.name} size={18} />)}
+            {others.map((m) => <Avatar key={m.userId} name={m.name} size={18} />)}
             {others.length > 0 && others.map((m) => m.name).join(", ")}
           </span>
         </span>
