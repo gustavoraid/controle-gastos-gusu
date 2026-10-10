@@ -394,8 +394,7 @@ select:focus {
 
 .card,
 .total-card,
-.balance-banner,
-.invite-card {
+.balance-banner {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 16px;
@@ -409,12 +408,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.invite-card {
-  background: var(--brand-soft);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 .balance-banner {
   display: flex;
@@ -632,6 +625,10 @@ select:focus {
   text-align: left;
   font-variant-numeric: tabular-nums;
 }
+.conversion {
+  text-align: center;
+  margin-top: -8px;
+}
 .desc-input {
   text-align: center;
 }
@@ -727,6 +724,11 @@ select:focus {
   width: 5rem !important;
   text-align: right;
 }
+.pct-label {
+  width: 3.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .emoji-select {
   width: 4.5rem !important;
   font-size: 22px !important;
@@ -738,6 +740,22 @@ select:focus {
   padding: 8px !important;
   font-size: 20px !important;
 }
+.currency-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.currency-list > li + li {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.currency-select {
+  width: auto !important;
+  max-width: 55%;
+}
 .cat-edit-list {
   list-style: none;
   padding: 0;
@@ -748,13 +766,38 @@ select:focus {
 }
 .cat-edit-list li {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cat-edit-row {
+  display: flex;
   align-items: center;
   gap: 6px;
 }
-.cat-edit-list .icon-btn {
-  width: 36px;
-  height: 36px;
-  font-size: 22px;
+.suggestions-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0 12px 12px;
+  border-left: 3px solid var(--brand-soft);
+  margin-left: 8px;
+}
+.chip.removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  cursor: default;
+}
+.chip.removable button {
+  border: 0;
+  background: var(--surface-2);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 /* ------------------------------------------------------------ login */

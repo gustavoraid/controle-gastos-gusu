@@ -32,56 +32,33 @@ export function splitByWeights(totalCents: number, shares: Share[]): SplitLine[]
   return lines;
 }
 
-/** Pesos → porcentagens inteiras que somam 100 (para exibir "60% / 40%"). */
-export function weightsToPercents(shares: Share[]): number[] {
-  return splitByWeights(100, shares).map((l) => l.amountCents);
-}
-
-export type SplitMode = "project" | "equal" | "payer" | "other" | "exact";
+const pctFmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 
 /**
- * Monta a divisão de uma despesa conforme o modo escolhido na tela.
- * - project: proporção padrão do projeto
- * - equal:   partes iguais entre todos os membros
- * - payer:   despesa pessoal de quem pagou (ninguém deve nada)
- * - other:   quem pagou adiantou tudo pelo(s) outro(s)
- * - exact:   valores digitados à mão (precisam somar o total)
+ * Pesos → rótulos de porcentagem para exibir ("33,3%", "66,7%"). Pesos são
+ * livres (1 e 2, 60 e 40, 3 e 2…): o cálculo usa a razão exata, nunca o
+ * percentual arredondado — este é só para mostrar.
  */
-export function buildSplit(params: {
-  mode: SplitMode;
-  totalCents: number;
-  paidBy: string;
-  members: Share[];
-  exact?: Record<string, number>;
-}): SplitLine[] {
-  const { mode, totalCents, paidBy, members, exact } = params;
-  switch (mode) {
-    case "project":
-      return splitByWeights(totalCents, members);
-    case "equal":
-      return splitByWeights(
-        totalCents,
-        members.map((m) => ({ userId: m.userId, weight: 1 })),
-      );
-    case "payer":
-      return members.map((m) => ({
-        userId: m.userId,
-        amountCents: m.userId === paidBy ? totalCents : 0,
-      }));
-    case "other": {
-      const others = members.filter((m) => m.userId !== paidBy);
-      const parts = splitByWeights(
-        totalCents,
-        others.map((m) => ({ userId: m.userId, weight: 1 })),
-      );
-      return members.map((m) => ({
-        userId: m.userId,
-        amountCents: parts.find((p) => p.userId === m.userId)?.amountCents ?? 0,
-      }));
-    }
-    case "exact":
-      return members.map((m) => ({ userId: m.userId, amountCents: exact?.[m.userId] ?? 0 }));
-  }
+export function percentLabels(shares: Share[]): string[] {
+  const sum = shares.reduce((acc, s) => acc + Math.max(0, s.weight), 0);
+  return shares.map((s) => `${pctFmt.format(sum > 0 ? (Math.max(0, s.weight) / sum) * 100 : 100 / shares.length)}%`);
+}
+
+/** "2", "1,5", "0.5" → número; inválido ou negativo → null. */
+export function parseWeight(input: string): number | null {
+  const s = input.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,4})?$/.test(s)) return null;
+  return Number(s);
+}
+
+/**
+ * Parte de cada pessoa numa despesa: sempre a proporção ATUAL do projeto.
+ * Ordena por userId para o centavo de desempate cair no mesmo lugar que na
+ * view expense_shares do banco (que desempata pelo menor user_id).
+ */
+export function expenseShares(totalCents: number, members: Share[]): SplitLine[] {
+  const sorted = [...members].sort((a, b) => (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
+  return splitByWeights(totalCents, sorted);
 }
 
 export function splitTotal(lines: SplitLine[]): number {

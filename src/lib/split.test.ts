@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSplit, splitByWeights, splitTotal, weightsToPercents } from "./split";
+import {
+  expenseShares,
+  parseWeight,
+  percentLabels,
+  splitByWeights,
+  splitTotal,
+} from "./split";
 
 const casal = [
   { userId: "ana", weight: 60 },
@@ -52,31 +58,58 @@ describe("splitByWeights", () => {
   });
 });
 
-describe("weightsToPercents", () => {
-  it("normaliza pesos arbitrários para 100", () => {
-    expect(weightsToPercents([{ userId: "a", weight: 1 }, { userId: "b", weight: 2 }])).toEqual([33, 67]);
-    expect(weightsToPercents(casal)).toEqual([60, 40]);
+describe("expenseShares", () => {
+  it("usa a proporção do projeto", () => {
+    expect(expenseShares(9000, casal)).toEqual([
+      { userId: "ana", amountCents: 5400 },
+      { userId: "beto", amountCents: 3600 },
+    ]);
+  });
+
+  it("desempate do centavo segue o menor userId, não a ordem da lista (igual ao banco)", () => {
+    const meio = [
+      { userId: "zz", weight: 1 },
+      { userId: "aa", weight: 1 },
+    ];
+    expect(expenseShares(1001, meio)).toEqual([
+      { userId: "aa", amountCents: 501 },
+      { userId: "zz", amountCents: 500 },
+    ]);
+  });
+
+  it("nunca perde centavo", () => {
+    for (const total of [1, 7, 99, 12345]) {
+      expect(splitTotal(expenseShares(total, [{ userId: "a", weight: 33 }, { userId: "b", weight: 67 }]))).toBe(total);
+    }
   });
 });
 
-describe("buildSplit", () => {
-  const base = { totalCents: 9000, paidBy: "ana", members: casal };
+describe("pesos livres", () => {
+  const umDois = [
+    { userId: "ana", weight: 1 },
+    { userId: "beto", weight: 2 },
+  ];
 
-  it("project usa a proporção do projeto", () => {
-    expect(buildSplit({ ...base, mode: "project" }).map((l) => l.amountCents)).toEqual([5400, 3600]);
+  it("1 e 2 divide pela razão exata (1/3 e 2/3), não por 33%/67%", () => {
+    expect(splitByWeights(100000, umDois).map((l) => l.amountCents)).toEqual([33333, 66667]);
   });
-  it("equal ignora a proporção", () => {
-    expect(buildSplit({ ...base, mode: "equal" }).map((l) => l.amountCents)).toEqual([4500, 4500]);
+
+  it("rótulos com uma casa decimal", () => {
+    expect(percentLabels(umDois)).toEqual(["33,3%", "66,7%"]);
+    expect(percentLabels([{ userId: "a", weight: 60 }, { userId: "b", weight: 40 }])).toEqual(["60%", "40%"]);
+    expect(percentLabels([{ userId: "a", weight: 0 }, { userId: "b", weight: 0 }])).toEqual(["50%", "50%"]);
   });
-  it("payer: despesa pessoal de quem pagou", () => {
-    expect(buildSplit({ ...base, mode: "payer" }).map((l) => l.amountCents)).toEqual([9000, 0]);
+
+  it.each([
+    ["2", 2],
+    ["1,5", 1.5],
+    ["0.25", 0.25],
+    [" 60 ", 60],
+  ])("lê peso %j", (input, value) => {
+    expect(parseWeight(input)).toBe(value);
   });
-  it("other: quem pagou adiantou tudo para o outro", () => {
-    expect(buildSplit({ ...base, mode: "other" }).map((l) => l.amountCents)).toEqual([0, 9000]);
-  });
-  it("exact usa os valores digitados", () => {
-    const lines = buildSplit({ ...base, mode: "exact", exact: { ana: 1000, beto: 8000 } });
-    expect(lines.map((l) => l.amountCents)).toEqual([1000, 8000]);
-    expect(splitTotal(lines)).toBe(9000);
+
+  it.each(["", "-1", "abc", "1,2,3"])("rejeita peso %j", (input) => {
+    expect(parseWeight(input)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ErrorBox, Header, Loading, haptic, toast } from "@/components/ui";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
-import { addSettlement } from "@/lib/api";
+import { addSettlement, newId } from "@/lib/api";
 import { suggestTransfers } from "@/lib/balances";
 import { todayISO } from "@/lib/dates";
 import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
@@ -34,6 +34,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
   const [to, setTo] = useState(suggestion?.to ?? other);
   const [amount, setAmount] = useState(suggestion ? centsToInput(suggestion.amountCents) : "");
   const [busy, setBusy] = useState(false);
+  const [draftId] = useState(newId);
 
   const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const cents = parseAmountToCents(amount);
@@ -43,7 +44,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
     if (!cents || from === to) return;
     setBusy(true);
     try {
-      await addSettlement({ projectId, fromUser: from, toUser: to, amountCents: cents, settledOn: todayISO(), me });
+      await addSettlement({ id: draftId, projectId, fromUser: from, toUser: to, amountCents: cents, settledOn: todayISO(), me });
       haptic();
       toast.ok("Pagamento registrado");
       back(`/p/${projectId}`);

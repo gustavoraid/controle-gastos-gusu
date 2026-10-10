@@ -1,27 +1,27 @@
 import { useState, type FormEvent } from "react";
 import { Chip, Header, toast } from "@/components/ui";
 import { back, go } from "@/hooks/useRoute";
-import { createProject, joinProject } from "@/lib/api";
+import { useLoad } from "@/hooks/useLoad";
+import { createProject, listProjects } from "@/lib/api";
+import { PROJECT_TYPES, type ProjectType } from "@/lib/types";
 
 const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚"];
 
-const TEMPLATES = [
-  { id: "casa", label: "Casa e dia a dia", hint: "Mercado, contas, restaurante, pets…" },
-  { id: "viagem", label: "Viagem", hint: "Passagens, hospedagem, passeios…" },
-  { id: "vazio", label: "Em branco", hint: "Só “Outros”; você cria as categorias" },
-];
-
-export function NewProject() {
+export function NewProject({ me }: { me: string }) {
+  const projects = useLoad(() => listProjects(me), [me]);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🏠");
-  const [template, setTemplate] = useState("casa");
+  const [type, setType] = useState<ProjectType>("casa");
+  const [copyFrom, setCopyFrom] = useState<string>("");
   const [busy, setBusy] = useState(false);
+
+  const source = projects.data?.find((p) => p.id === copyFrom);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      const id = await createProject(name.trim(), emoji, template);
+      const id = await createProject(name.trim(), emoji, type, copyFrom || null);
       go(`/p/${id}`, { replace: true });
     } catch (err) {
       toast.err((err as Error).message);
@@ -40,6 +40,17 @@ export function NewProject() {
           </label>
 
           <div className="field">
+            <span>Tipo</span>
+            <div className="segmented">
+              {PROJECT_TYPES.map((t) => (
+                <button type="button" key={t.id} className={type === t.id ? "active" : ""} onClick={() => setType(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
             <span>Ícone</span>
             <div className="chips">
               {EMOJIS.map((e) => (
@@ -50,70 +61,35 @@ export function NewProject() {
             </div>
           </div>
 
-          <div className="field">
-            <span>Categorias iniciais</span>
-            <div className="stack-sm">
-              {TEMPLATES.map((t) => (
-                <label key={t.id} className={`radio-card ${template === t.id ? "active" : ""}`}>
-                  <input type="radio" name="tpl" checked={template === t.id} onChange={() => setTemplate(t.id)} />
-                  <span>
-                    <strong>{t.label}</strong>
-                    <span className="muted small">{t.hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <span className="muted small">Dá para editar depois, em Ajustes do projeto.</span>
-          </div>
+          {projects.data && projects.data.length > 0 && (
+            <label className="field">
+              <span>Começar a partir de</span>
+              <select
+                value={copyFrom}
+                onChange={(e) => {
+                  setCopyFrom(e.target.value);
+                  const src = projects.data?.find((p) => p.id === e.target.value);
+                  if (src) setType(src.type);
+                }}
+              >
+                <option value="">Base padrão (categorias de casa com sugestões)</option>
+                {projects.data.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    Copiar de {p.emoji} {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-          <p className="muted small">A divisão começa 50/50. Você ajusta a proporção em Ajustes depois de convidar.</p>
+          <p className="muted small">
+            {source
+              ? `Copia de “${source.name}” a proporção, as moedas (com a cotação), as categorias e as descrições sugeridas. As despesas não são copiadas.`
+              : "Começa com Mercado, Contas, Casa, Restaurante… e descrições sugeridas (Luz, Feira, Aluguel…). Tudo editável em Ajustes. O projeto já nasce com vocês dois, dividindo 50/50."}
+          </p>
 
           <button className="btn primary big" disabled={busy || !name.trim()}>
             {busy ? "Criando…" : "Criar projeto"}
-          </button>
-        </form>
-      </main>
-    </>
-  );
-}
-
-export function JoinProject({ code: initial }: { code?: string }) {
-  const [code, setCode] = useState(initial ?? "");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const id = await joinProject(code);
-      toast.ok("Você entrou no projeto!");
-      go(`/p/${id}`, { replace: true });
-    } catch (err) {
-      toast.err((err as Error).message);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <Header title="Entrar com convite" onBack={() => back("/")} />
-      <main className="page">
-        <form onSubmit={submit} className="stack">
-          <label className="field">
-            <span>Código do convite</span>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="ex.: 3fa9c01b2e"
-              required
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoFocus={!initial}
-            />
-          </label>
-          <button className="btn primary big" disabled={busy || !code.trim()}>
-            {busy ? "Entrando…" : "Entrar no projeto"}
           </button>
         </form>
       </main>

@@ -6,11 +6,11 @@ import { back, go } from "@/hooks/useRoute";
 import { deleteSettlement, listMonth } from "@/lib/api";
 import { expenseImpact, suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
-import { weightsToPercents } from "@/lib/split";
+import { expenseShares, percentLabels } from "@/lib/split";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
-import { shareInvite } from "@/screens/ProjectSettings";
 
 type Item = { kind: "e"; date: string; at: string; e: Expense } | { kind: "s"; date: string; at: string; s: Settlement };
 
@@ -54,17 +54,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
     <>
       <Header title={`${project.emoji} ${project.name}`} onBack={() => back("/")} action={settingsBtn} />
       <main className="page with-fab">
-        {members.length < 2 && (
-          <section className="invite-card">
-            <p>
-              <strong>Só você aqui.</strong> Mande o convite para quem vai dividir os gastos.
-            </p>
-            <button className="btn primary" onClick={() => shareInvite(project)}>
-              Enviar convite
-            </button>
-          </section>
-        )}
-
         <BalanceBanner me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
 
         <nav className="month-nav">
@@ -92,6 +81,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           <ActivityList
             me={me}
             projectId={id}
+            members={members}
             names={names}
             cats={cats}
             expenses={activity.data.expenses}
@@ -118,7 +108,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
   const { me, members, balances } = props;
   const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
   const mine = suggestTransfers(balances).filter((t) => t.from === me || t.to === me);
-  const pct = weightsToPercents(members);
+  const pct = percentLabels(members);
 
   return (
     <section className="balance-banner">
@@ -141,7 +131,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
       )}
       <div className="row between">
         <span className="muted small">
-          Divisão padrão: {members.map((m, i) => `${m.name} ${pct[i]}%`).join(" · ")}
+          Divisão padrão: {members.map((m, i) => `${m.name} ${pct[i]}`).join(" · ")}
         </span>
         {mine.length > 0 && (
           <button className="btn small ghost" onClick={props.onSettle}>
@@ -156,6 +146,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
 function ActivityList(props: {
   me: string;
   projectId: string;
+  members: Member[];
   names: Map<string, string>;
   cats: Map<string, Category>;
   expenses: Expense[];
@@ -204,7 +195,7 @@ function ActivityList(props: {
           <ul className="list">
             {g.items.map((it) =>
               it.kind === "e" ? (
-                <ExpenseRow key={it.e.id} e={it.e} me={me} names={names} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
+                <ExpenseRow key={it.e.id} e={it.e} me={me} members={props.members} names={names} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
               ) : (
                 <li key={it.s.id}>
                   <button className="list-item" onClick={() => removeSettlement(it.s)}>
@@ -227,10 +218,11 @@ function ActivityList(props: {
   );
 }
 
-function ExpenseRow(props: { e: Expense; me: string; names: Map<string, string>; cat?: Category; projectId: string }) {
+function ExpenseRow(props: { e: Expense; me: string; members: Member[]; names: Map<string, string>; cat?: Category; projectId: string }) {
   const { e, me, names, cat } = props;
-  const impact = expenseImpact(e, e.splits, me);
-  const involved = e.paidBy === me || e.splits.some((s) => s.userId === me && s.amountCents > 0);
+  const shares = expenseShares(e.amountCents, props.members);
+  const impact = expenseImpact(e, shares, me);
+  const involved = e.paidBy === me || shares.some((s) => s.userId === me && s.amountCents > 0);
   const payer = e.paidBy === me ? "Você" : names.get(e.paidBy) ?? "?";
 
   return (
@@ -240,7 +232,10 @@ function ExpenseRow(props: { e: Expense; me: string; names: Map<string, string>;
         <span className="grow min0">
           <strong className="ellipsis">{e.description}</strong>
           <span className="muted small">
-            {payer} pagou {formatBRL(e.amountCents)}
+            {payer} pagou{" "}
+            {e.currency === "BRL"
+              ? formatBRL(e.amountCents)
+              : `${formatMoney(e.amount, e.currency)} (≈ ${formatBRL(e.amountCents)})`}
           </span>
         </span>
         <span className="impact">
@@ -273,6 +268,10 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
     );
   }
 
+  const foreign = new Map<string, number>();
+  for (const e of expenses) if (e.currency !== "BRL") foreign.set(e.currency, (foreign.get(e.currency) ?? 0) + e.amount);
+  const foreignTotals = [...foreign.entries()];
+
   const byCat = new Map<string, number>();
   for (const e of expenses) {
     const k = e.categoryId ?? "";
@@ -284,7 +283,10 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
   const people = members.map((m) => ({
     m,
     paid: expenses.filter((e) => e.paidBy === m.userId).reduce((acc, e) => acc + e.amountCents, 0),
-    share: expenses.reduce((acc, e) => acc + (e.splits.find((s) => s.userId === m.userId)?.amountCents ?? 0), 0),
+    share: expenses.reduce(
+      (acc, e) => acc + (expenseShares(e.amountCents, members).find((s) => s.userId === m.userId)?.amountCents ?? 0),
+      0,
+    ),
   }));
 
   return (
@@ -293,6 +295,11 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
         <span className="muted">Total gasto no mês</span>
         <span className="money big">{formatBRL(total)}</span>
         <span className="muted small">{expenses.length} despesa{expenses.length > 1 ? "s" : ""}</span>
+        {foreignTotals.length > 0 && (
+          <span className="muted small">
+            Inclui {foreignTotals.map(([code, amt]) => formatMoney(amt, code)).join(" e ")} convertidos pela cotação do projeto
+          </span>
+        )}
       </section>
 
       <section className="card">

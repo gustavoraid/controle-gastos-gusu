@@ -4,11 +4,20 @@ export interface Member {
   weight: number;
 }
 
+export type ProjectType = "casa" | "viagem" | "outros";
+
+export const PROJECT_TYPES: { id: ProjectType; label: string }[] = [
+  { id: "casa", label: "Casa" },
+  { id: "viagem", label: "Viagem" },
+  { id: "outros", label: "Outros" },
+];
+
 export interface Project {
   id: string;
   name: string;
   emoji: string;
-  inviteCode: string;
+  type: ProjectType;
+  defaultCurrency: string;
   createdBy: string;
   archived: boolean;
 }
@@ -19,18 +28,34 @@ export interface Category {
   emoji: string;
   position: number;
   archived: boolean;
+  suggestions: Suggestion[];
+}
+
+export interface Suggestion {
+  id: string;
+  text: string;
+  position: number;
+}
+
+/** Moeda aceita no projeto; rate = reais por 1 unidade (BRL = 1). */
+export interface ProjectCurrency {
+  code: string;
+  rate: number;
 }
 
 export interface Expense {
   id: string;
   projectId: string;
   description: string;
+  /** Valor na moeda da despesa, na menor unidade. */
+  amount: number;
+  currency: string;
+  /** Valor em centavos de real pela cotação atual do projeto (é o que entra no saldo). */
   amountCents: number;
   paidBy: string;
   categoryId: string | null;
   spentOn: string;
   createdAt: string;
-  splits: { userId: string; amountCents: number }[];
 }
 
 export interface Settlement {
