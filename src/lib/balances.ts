@@ -1,3 +1,5 @@
+import { expenseShares, type Share } from "@/lib/split";
+
 export interface Transfer {
   from: string;
   to: string;
@@ -44,4 +46,26 @@ export function expenseImpact(
   const myShare = splits.find((s) => s.userId === me)?.amountCents ?? 0;
   const paid = expense.paidBy === me ? expense.amountCents : 0;
   return paid - myShare;
+}
+
+/**
+ * Saldo líquido de cada membro (positivo = tem a receber), recalculando todas as
+ * despesas pela proporção informada. Mesma conta da view project_balances; serve
+ * para prever o efeito de mudar a proporção antes de salvar.
+ */
+export function computeNets(
+  expenses: { paidBy: string; amountCents: number }[],
+  settlements: { fromUser: string; toUser: string; amountCents: number }[],
+  members: Share[],
+): Record<string, number> {
+  const nets: Record<string, number> = Object.fromEntries(members.map((m) => [m.userId, 0]));
+  for (const e of expenses) {
+    nets[e.paidBy] = (nets[e.paidBy] ?? 0) + e.amountCents;
+    for (const sh of expenseShares(e.amountCents, members)) nets[sh.userId] -= sh.amountCents;
+  }
+  for (const t of settlements) {
+    nets[t.fromUser] = (nets[t.fromUser] ?? 0) + t.amountCents;
+    nets[t.toUser] = (nets[t.toUser] ?? 0) - t.amountCents;
+  }
+  return nets;
 }

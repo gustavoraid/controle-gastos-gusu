@@ -11,7 +11,6 @@ export interface Project {
   inviteCode: string;
   createdBy: string;
   archived: boolean;
-  template: "casa" | "viagem" | "vazio";
 }
 
 export interface Category {
@@ -38,7 +37,6 @@ export interface Expense {
   categoryId: string | null;
   spentOn: string;
   createdAt: string;
-  splits: { userId: string; amountCents: number }[];
 }
 
 export interface Settlement {

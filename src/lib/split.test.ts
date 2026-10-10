@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitByWeights, splitForExpense, splitTotal, weightsToPercents } from "./split";
+import { expenseShares, splitByWeights, splitTotal, weightsToPercents } from "./split";
 
 const casal = [
   { userId: "ana", weight: 60 },
@@ -59,39 +59,28 @@ describe("weightsToPercents", () => {
   });
 });
 
-describe("splitForExpense", () => {
-  it("despesa nova usa a proporção do projeto", () => {
-    expect(splitForExpense(9000, casal).map((l) => l.amountCents)).toEqual([5400, 3600]);
-  });
-
-  it("ao editar, mantém a proporção original mesmo que a do projeto tenha mudado", () => {
-    const original = [
-      { userId: "ana", amountCents: 5000 },
-      { userId: "beto", amountCents: 5000 },
-    ];
-    // Projeto agora é 60/40, mas a despesa foi lançada 50/50: novo valor segue 50/50.
-    expect(splitForExpense(3001, casal, original)).toEqual([
-      { userId: "ana", amountCents: 1501 },
-      { userId: "beto", amountCents: 1500 },
+describe("expenseShares", () => {
+  it("usa a proporção do projeto", () => {
+    expect(expenseShares(9000, casal)).toEqual([
+      { userId: "ana", amountCents: 5400 },
+      { userId: "beto", amountCents: 3600 },
     ]);
   });
 
-  it("membro sem parte na despesa original continua sem parte", () => {
-    const original = [{ userId: "ana", amountCents: 1000 }];
-    expect(splitForExpense(2000, casal, original).map((l) => l.amountCents)).toEqual([2000, 0]);
-  });
-
-  it("divisão anterior vazia volta para a proporção do projeto", () => {
-    expect(splitForExpense(1000, casal, []).map((l) => l.amountCents)).toEqual([600, 400]);
+  it("desempate do centavo segue o menor userId, não a ordem da lista (igual ao banco)", () => {
+    const meio = [
+      { userId: "zz", weight: 1 },
+      { userId: "aa", weight: 1 },
+    ];
+    expect(expenseShares(1001, meio)).toEqual([
+      { userId: "aa", amountCents: 501 },
+      { userId: "zz", amountCents: 500 },
+    ]);
   });
 
   it("nunca perde centavo", () => {
-    const original = [
-      { userId: "ana", amountCents: 333 },
-      { userId: "beto", amountCents: 667 },
-    ];
     for (const total of [1, 7, 99, 12345]) {
-      expect(splitTotal(splitForExpense(total, casal, original))).toBe(total);
+      expect(splitTotal(expenseShares(total, [{ userId: "a", weight: 33 }, { userId: "b", weight: 67 }]))).toBe(total);
     }
   });
 });

@@ -7,7 +7,7 @@ import { deleteSettlement, listMonth } from "@/lib/api";
 import { expenseImpact, suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
-import { weightsToPercents } from "@/lib/split";
+import { expenseShares, weightsToPercents } from "@/lib/split";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 import { shareInvite } from "@/screens/ProjectSettings";
@@ -92,6 +92,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           <ActivityList
             me={me}
             projectId={id}
+            members={members}
             names={names}
             cats={cats}
             expenses={activity.data.expenses}
@@ -156,6 +157,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
 function ActivityList(props: {
   me: string;
   projectId: string;
+  members: Member[];
   names: Map<string, string>;
   cats: Map<string, Category>;
   expenses: Expense[];
@@ -204,7 +206,7 @@ function ActivityList(props: {
           <ul className="list">
             {g.items.map((it) =>
               it.kind === "e" ? (
-                <ExpenseRow key={it.e.id} e={it.e} me={me} names={names} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
+                <ExpenseRow key={it.e.id} e={it.e} me={me} members={props.members} names={names} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
               ) : (
                 <li key={it.s.id}>
                   <button className="list-item" onClick={() => removeSettlement(it.s)}>
@@ -227,10 +229,11 @@ function ActivityList(props: {
   );
 }
 
-function ExpenseRow(props: { e: Expense; me: string; names: Map<string, string>; cat?: Category; projectId: string }) {
+function ExpenseRow(props: { e: Expense; me: string; members: Member[]; names: Map<string, string>; cat?: Category; projectId: string }) {
   const { e, me, names, cat } = props;
-  const impact = expenseImpact(e, e.splits, me);
-  const involved = e.paidBy === me || e.splits.some((s) => s.userId === me && s.amountCents > 0);
+  const shares = expenseShares(e.amountCents, props.members);
+  const impact = expenseImpact(e, shares, me);
+  const involved = e.paidBy === me || shares.some((s) => s.userId === me && s.amountCents > 0);
   const payer = e.paidBy === me ? "Você" : names.get(e.paidBy) ?? "?";
 
   return (
@@ -284,7 +287,10 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
   const people = members.map((m) => ({
     m,
     paid: expenses.filter((e) => e.paidBy === m.userId).reduce((acc, e) => acc + e.amountCents, 0),
-    share: expenses.reduce((acc, e) => acc + (e.splits.find((s) => s.userId === m.userId)?.amountCents ?? 0), 0),
+    share: expenses.reduce(
+      (acc, e) => acc + (expenseShares(e.amountCents, members).find((s) => s.userId === m.userId)?.amountCents ?? 0),
+      0,
+    ),
   }));
 
   return (

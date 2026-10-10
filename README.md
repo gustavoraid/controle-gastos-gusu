@@ -3,9 +3,10 @@
 App de celular (PWA) para controlar e dividir gastos a dois, no estilo Splitwise.
 
 - **Projetos** separados (Casa, Viagem…), cada um com a **proporção de divisão** própria (ex.: 60/40),
-  aplicada a todas as despesas do projeto.
-- **Categorias por projeto**, já semeadas por modelo (Casa / Viagem / Em branco) e editáveis, com
-  **descrições sugeridas** por categoria (no modelo Casa: Luz, Água, Feira, Aluguel…).
+  aplicada a todas as despesas do projeto — mudar a proporção recalcula todas, inclusive as antigas.
+- **Categorias por projeto** com **descrições sugeridas** (Luz, Água, Feira, Aluguel…). Projeto novo
+  começa com uma base padrão de casa ou **copia outro projeto** (pessoas, proporção, categorias e
+  sugestões).
 - **Lançamento rápido**: valor → categoria → toque numa sugestão → salvar. "Quem pagou" já vem como
   você e a data como hoje. Descrição é obrigatória.
 - **Saldo** ("Fulana te deve R$ X") e **acerto de contas** (registro do Pix).
@@ -54,11 +55,11 @@ A outra pessoa cria a conta dela e entra pelo link. Ajuste a proporção em **Aj
 
 ## Como a divisão funciona
 
-- A proporção é **do projeto**: não há divisão diferente por despesa.
-- Ao lançar, o app grava quanto coube a cada pessoa (`expense_splits`), uma "foto" da proporção
-  daquele momento. Mudar a proporção do projeto vale para as próximas despesas e **não reescreve o
-  histórico** (nem o saldo já acumulado). Editar uma despesa antiga mantém a proporção com que ela
-  foi lançada.
+- A proporção é **do projeto** (`project_members.weight`): não há divisão por despesa e nada é
+  gravado por despesa. A parte de cada um é sempre calculada com a proporção atual.
+- Por isso **mudar a proporção recalcula todas as despesas e o saldo**, inclusive o que já foi
+  acertado. Antes de salvar, o app mostra o saldo antes/depois e pede confirmação.
+- Quem entra no projeto depois passa a dividir também as despesas lançadas antes.
 - Centavos ímpares vão para quem tem o maior resto (nada some, nada sobra) — `src/lib/split.ts`.
 - Saldo = pagou − parte que lhe cabe + acertos enviados − acertos recebidos, calculado no banco
   (`project_balances`).
@@ -67,14 +68,14 @@ A outra pessoa cria a conta dela e entra pelo link. Ajuste a proporção em **Aj
 
 ```
 profiles ─┐
-          ├─ project_members (peso na divisão) ── projects (nome, emoji, tipo, convite)
+          ├─ project_members (peso na divisão) ── projects (nome, emoji, código de convite)
           │                                           │
           │                                           ├─ categories ── category_suggestions
           │                                           │
           ├─ expenses (valor, quem pagou, categoria, data, descrição)
-          │     └─ expense_splits (parte de cada pessoa)
           └─ settlements (acertos: quem pagou a quem)
 
+expense_shares (view)   = parte de cada pessoa em cada despesa, pela proporção atual
 project_balances (view) = saldo de cada pessoa por projeto
 ```
 

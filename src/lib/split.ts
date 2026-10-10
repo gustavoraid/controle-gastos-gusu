@@ -38,22 +38,13 @@ export function weightsToPercents(shares: Share[]): number[] {
 }
 
 /**
- * Divisão de uma despesa. A regra é sempre a proporção do projeto; ao editar uma
- * despesa antiga, mantém a proporção com que ela foi lançada (se a do projeto
- * mudou depois, editar o valor não reescreve o passado).
+ * Parte de cada pessoa numa despesa: sempre a proporção ATUAL do projeto.
+ * Ordena por userId para o centavo de desempate cair no mesmo lugar que na
+ * view expense_shares do banco (que desempata pelo menor user_id).
  */
-export function splitForExpense(
-  totalCents: number,
-  members: Share[],
-  previous?: SplitLine[],
-): SplitLine[] {
-  const prevTotal = previous?.reduce((acc, l) => acc + l.amountCents, 0) ?? 0;
-  if (!previous || prevTotal === 0) return splitByWeights(totalCents, members);
-  const weights = members.map((m) => ({
-    userId: m.userId,
-    weight: previous.find((l) => l.userId === m.userId)?.amountCents ?? 0,
-  }));
-  return splitByWeights(totalCents, weights);
+export function expenseShares(totalCents: number, members: Share[]): SplitLine[] {
+  const sorted = [...members].sort((a, b) => (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
+  return splitByWeights(totalCents, sorted);
 }
 
 export function splitTotal(lines: SplitLine[]): number {

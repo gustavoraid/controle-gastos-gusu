@@ -50,7 +50,7 @@ function Routes() {
   const me = session.user.id;
   const [a, b, c] = parts;
 
-  if (a === "novo") return <NewProject />;
+  if (a === "novo") return <NewProject me={me} />;
   if (a === "entrar") return <JoinProject code={b} />;
   if (a === "p" && b) {
     if (c === "add") return <ExpenseForm projectId={b} expenseId={params.get("e")} me={me} />;

@@ -6,7 +6,7 @@ import { back } from "@/hooks/useRoute";
 import { deleteExpense, getExpense, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
-import { splitForExpense, weightsToPercents } from "@/lib/split";
+import { expenseShares, weightsToPercents } from "@/lib/split";
 import type { Category, Expense, Member } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
@@ -57,9 +57,9 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
 
   const cents = parseAmountToCents(amount);
   const desc = description.trim();
-  const lines = cents ? splitForExpense(cents, members, existing?.splits) : [];
+  const lines = cents ? expenseShares(cents, members) : [];
   const category = categories.find((c) => c.id === categoryId);
-  const pct = existing ? null : weightsToPercents(members);
+  const pct = weightsToPercents(members);
   const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const today = todayISO();
   const yesterday = addDaysISO(today, -1);
@@ -87,7 +87,6 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
         paidBy,
         categoryId,
         spentOn: date,
-        splits: lines,
       });
       haptic();
       toast.ok(existing ? "Despesa atualizada" : `${formatBRL(cents)} lançado`);
@@ -207,7 +206,7 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
 
         {members.length > 1 && (
           <p className="muted small split-preview">
-            {pct ? `Divisão do projeto (${pct.join("/")})` : "Divisão original desta despesa"}
+            Divisão do projeto ({pct.join("/")})
             {cents ? `: ${lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" · ")}` : ""}
           </p>
         )}

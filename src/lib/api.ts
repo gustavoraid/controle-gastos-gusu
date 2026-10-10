@@ -44,7 +44,6 @@ const mapProject = (r: any): Project => ({
   inviteCode: r.invite_code,
   createdBy: r.created_by,
   archived: r.archived,
-  template: r.template ?? "casa",
 });
 
 const mapMembers = (rows: any[]): Member[] =>
@@ -61,10 +60,6 @@ const mapExpense = (r: any): Expense => ({
   categoryId: r.category_id,
   spentOn: r.spent_on,
   createdAt: r.created_at,
-  splits: (r.expense_splits ?? []).map((s: any) => ({
-    userId: s.user_id,
-    amountCents: Number(s.amount_cents),
-  })),
 });
 
 const mapSettlement = (r: any): Settlement => ({
@@ -155,9 +150,10 @@ export async function getBalances(projectId: string): Promise<Record<string, num
   return Object.fromEntries(rows.map((r) => [r.user_id, Number(r.net_cents)]));
 }
 
-export async function createProject(name: string, emoji: string, template: string) {
+/** copyFrom: projeto cujas pessoas, proporção, categorias e sugestões serão copiadas. */
+export async function createProject(name: string, emoji: string, copyFrom: string | null) {
   return check<string>(
-    await supabase.rpc("create_project", { p_name: name, p_emoji: emoji, p_template: template }),
+    await supabase.rpc("create_project", { p_name: name, p_emoji: emoji, p_copy_from: copyFrom }),
   );
 }
 
@@ -217,7 +213,7 @@ export async function listMonth(projectId: string, start: string, end: string) {
   const expenses = await fetchAll<any>((from, to) =>
     supabase
       .from("expenses")
-      .select("*, expense_splits(user_id, amount_cents)")
+      .select("*")
       .eq("project_id", projectId)
       .gte("spent_on", start)
       .lte("spent_on", end)
@@ -242,7 +238,7 @@ export async function listMonth(projectId: string, start: string, end: string) {
 
 export async function getExpense(id: string): Promise<Expense> {
   return mapExpense(
-    check(await supabase.from("expenses").select("*, expense_splits(user_id, amount_cents)").eq("id", id).single()),
+    check(await supabase.from("expenses").select("*").eq("id", id).single()),
   );
 }
 
@@ -254,20 +250,43 @@ export async function saveExpense(input: {
   paidBy: string;
   categoryId: string | null;
   spentOn: string;
-  splits: { userId: string; amountCents: number }[];
 }) {
-  return check<string>(
-    await supabase.rpc("save_expense", {
-      p_id: input.id,
-      p_project_id: input.projectId,
-      p_description: input.description,
-      p_amount_cents: input.amountCents,
-      p_paid_by: input.paidBy,
-      p_category_id: input.categoryId,
-      p_spent_on: input.spentOn,
-      p_splits: input.splits.map((s) => ({ user_id: s.userId, amount_cents: s.amountCents })),
-    }),
+  const row = {
+    project_id: input.projectId,
+    description: input.description,
+    amount_cents: input.amountCents,
+    paid_by: input.paidBy,
+    category_id: input.categoryId,
+    spent_on: input.spentOn,
+  };
+  if (input.id) {
+    check(await supabase.from("expenses").update({ ...row, updated_at: new Date().toISOString() }).eq("id", input.id));
+  } else {
+    check(await supabase.from("expenses").insert(row));
+  }
+}
+
+/** Todas as despesas e acertos do projeto (só o necessário para recalcular saldos). */
+export async function listAllForBalance(projectId: string) {
+  const expenses = await fetchAll<any>((from, to) =>
+    supabase.from("expenses").select("id, paid_by, amount_cents").eq("project_id", projectId).order("id").range(from, to),
   );
+  const settlements = await fetchAll<any>((from, to) =>
+    supabase
+      .from("settlements")
+      .select("id, from_user, to_user, amount_cents")
+      .eq("project_id", projectId)
+      .order("id")
+      .range(from, to),
+  );
+  return {
+    expenses: expenses.map((e) => ({ paidBy: e.paid_by as string, amountCents: Number(e.amount_cents) })),
+    settlements: settlements.map((t) => ({
+      fromUser: t.from_user as string,
+      toUser: t.to_user as string,
+      amountCents: Number(t.amount_cents),
+    })),
+  };
 }
 
 export async function deleteExpense(id: string) {

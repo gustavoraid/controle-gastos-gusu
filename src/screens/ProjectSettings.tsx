@@ -9,10 +9,13 @@ import {
   deleteProject,
   deleteSuggestion,
   leaveProject,
+  listAllForBalance,
   setWeights,
   updateCategory,
   updateProject,
 } from "@/lib/api";
+import { computeNets, suggestTransfers } from "@/lib/balances";
+import { formatBRL } from "@/lib/money";
 import { weightsToPercents } from "@/lib/split";
 import type { Category, Member, Project } from "@/lib/types";
 
@@ -119,18 +122,37 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
   }
 
   async function save() {
+    const next = members.map((m, i) => ({ userId: m.userId, weight: pct[i] }));
     try {
-      await setWeights(projectId, Object.fromEntries(members.map((m, i) => [m.userId, pct[i]])));
-      toast.ok("Proporção salva. Vale para as próximas despesas.");
+      // Mudar a proporção recalcula todas as despesas, inclusive as já acertadas:
+      // mostra o saldo antes/depois para ninguém ser pego de surpresa.
+      const all = await listAllForBalance(projectId);
+      const before = describe(computeNets(all.expenses, all.settlements, members));
+      const after = describe(computeNets(all.expenses, all.settlements, next));
+      const msg =
+        all.expenses.length === 0
+          ? "Salvar a nova proporção?"
+          : `Isso recalcula as ${all.expenses.length} despesas já lançadas neste projeto.\n\n` +
+            `Saldo hoje: ${before}\nSaldo depois: ${after}\n\nSalvar?`;
+      if (!confirm(msg)) return;
+      await setWeights(projectId, Object.fromEntries(next.map((n) => [n.userId, n.weight])));
+      toast.ok("Proporção salva");
     } catch (err) {
       toast.err((err as Error).message);
     }
   }
 
+  function describe(nets: Record<string, number>) {
+    const t = suggestTransfers(nets);
+    if (t.length === 0) return "quitado";
+    const nm = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
+    return t.map((x) => `${nm(x.from)} deve ${formatBRL(x.amountCents)} a ${nm(x.to)}`).join("; ");
+  }
+
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Proporção da divisão</h2>
-      <p className="muted small">Toda despesa deste projeto é dividida assim. Mudar aqui vale para os próximos lançamentos; os já lançados continuam como foram.</p>
+      <p className="muted small">Toda despesa deste projeto é dividida assim. Mudar aqui recalcula também as despesas já lançadas (e o saldo).</p>
       {members.length === 2 && (
         <input type="range" min={0} max={100} step={5} value={pct[0]} onChange={(e) => setAt(0, Number(e.target.value))} aria-label={`Parte de ${members[0].name}`} className="slider" />
       )}
