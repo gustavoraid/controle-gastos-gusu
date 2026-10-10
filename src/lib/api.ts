@@ -126,7 +126,11 @@ export async function getProject(id: string) {
   const r = check<any>(
     await supabase
       .from("projects")
-      .select("*, project_members(user_id, weight, profiles(display_name)), project_currencies(code, rate)")
+      // projects ↔ project_currencies têm duas ligações (moedas do projeto e moeda padrão):
+      // o nome da FK diz ao PostgREST qual usar no embed.
+      .select(
+        "*, project_members(user_id, weight, profiles(display_name)), project_currencies!project_currencies_project_id_fkey(code, rate)",
+      )
       .eq("id", id)
       .single(),
   );

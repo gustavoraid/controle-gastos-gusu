@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { Chip, Header, toast } from "@/components/ui";
+import { EmojiPicker } from "@/components/EmojiPicker";
+import { Header, toast } from "@/components/ui";
 import { back, go } from "@/hooks/useRoute";
 import { useLoad } from "@/hooks/useLoad";
 import { createProject, listProjects } from "@/lib/api";
 import { PROJECT_TYPES, type ProjectType } from "@/lib/types";
 
-const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚"];
 
 export function NewProject({ me }: { me: string }) {
   const projects = useLoad(() => listProjects(me), [me]);
@@ -52,13 +52,7 @@ export function NewProject({ me }: { me: string }) {
 
           <div className="field">
             <span>Ícone</span>
-            <div className="chips">
-              {EMOJIS.map((e) => (
-                <Chip key={e} active={emoji === e} onClick={() => setEmoji(e)}>
-                  <span className="emoji-lg">{e}</span>
-                </Chip>
-              ))}
-            </div>
+            <EmojiPicker value={emoji} onChange={setEmoji} />
           </div>
 
           {projects.data && projects.data.length > 0 && (
