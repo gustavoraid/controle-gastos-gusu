@@ -247,31 +247,23 @@ export async function deleteSuggestion(id: string) {
 
 // ---------------------------------------------------------------- despesas
 
-export async function listMonth(projectId: string, start: string, end: string) {
+/** Despesas e acertos do projeto num intervalo de datas; sem intervalo, todos (viagem). */
+export async function listActivity(projectId: string, range?: { start: string; end: string }) {
   const rates = await getRates(projectId);
-  const expenses = await fetchAll<any>((from, to) =>
-    supabase
-      .from("expenses")
-      .select("*")
-      .eq("project_id", projectId)
-      .gte("spent_on", start)
-      .lte("spent_on", end)
+  const expenses = await fetchAll<any>((from, to) => {
+    let q = supabase.from("expenses").select("*").eq("project_id", projectId);
+    if (range) q = q.gte("spent_on", range.start).lte("spent_on", range.end);
+    return q
       .order("spent_on", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id")
-      .range(from, to),
-  );
-  const settlements = await fetchAll<any>((from, to) =>
-    supabase
-      .from("settlements")
-      .select("*")
-      .eq("project_id", projectId)
-      .gte("settled_on", start)
-      .lte("settled_on", end)
-      .order("settled_on", { ascending: false })
-      .order("id")
-      .range(from, to),
-  );
+      .range(from, to);
+  });
+  const settlements = await fetchAll<any>((from, to) => {
+    let q = supabase.from("settlements").select("*").eq("project_id", projectId);
+    if (range) q = q.gte("settled_on", range.start).lte("settled_on", range.end);
+    return q.order("settled_on", { ascending: false }).order("id").range(from, to);
+  });
   return { expenses: expenses.map((e) => mapExpense(e, rates)), settlements: settlements.map(mapSettlement) };
 }
 

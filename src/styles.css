@@ -468,13 +468,6 @@ select:focus {
   flex-direction: column;
   gap: 2px;
 }
-.impact {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  flex: none;
-}
 
 .cat-badge {
   width: 42px;
@@ -496,12 +489,16 @@ select:focus {
 }
 
 .avatar {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   color: #fff;
   font-weight: 700;
   flex: none;
+  /* line-height herdado (1.4) empurrava a letra para baixo nas bolinhas pequenas */
+  line-height: 1;
+  text-align: center;
 }
 
 .day-label {
@@ -866,4 +863,34 @@ select:focus {
   padding: 0 !important;
   border: 0 !important;
   cursor: pointer;
+}
+
+/* ------------------------------------------------------------ lista compacta */
+
+.list-item.compact {
+  min-height: 56px;
+  padding: 8px 12px;
+  gap: 10px;
+}
+.cat-badge.sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 18px;
+}
+.payer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.payer .avatar {
+  font-size: 9px !important;
+}
+.amount-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex: none;
 }
