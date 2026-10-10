@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 App pessoal de divisão de gastos de um casal (PWA). UI e domínio em português do Brasil.
+Exatamente duas contas (limite no banco); todo projeto inclui as duas — não há convite.
 
 - Stack: Vite + React 19 + TS + Supabase. Sem backend próprio: regras de acesso no RLS. Schema em
   `supabase/migrations/`.

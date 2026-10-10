@@ -8,7 +8,6 @@ export interface Project {
   id: string;
   name: string;
   emoji: string;
-  inviteCode: string;
   createdBy: string;
   archived: boolean;
 }

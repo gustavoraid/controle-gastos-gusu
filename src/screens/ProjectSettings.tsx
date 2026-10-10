@@ -8,7 +8,6 @@ import {
   deleteCategory,
   deleteProject,
   deleteSuggestion,
-  leaveProject,
   listAllForBalance,
   setWeights,
   updateCategory,
@@ -18,21 +17,6 @@ import { computeNets, suggestTransfers } from "@/lib/balances";
 import { formatBRL } from "@/lib/money";
 import { weightsToPercents } from "@/lib/split";
 import type { Category, Member, Project } from "@/lib/types";
-
-export async function shareInvite(project: Project) {
-  const url = `${location.origin}${location.pathname}#/entrar/${project.inviteCode}`;
-  const text = `Entra no projeto “${project.name}” no Gastos do Casal: ${url}`;
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: "Gastos do Casal", text, url });
-      return;
-    }
-    await navigator.clipboard.writeText(url);
-    toast.ok("Link copiado");
-  } catch (err) {
-    if ((err as Error).name !== "AbortError") toast.err(`Copie o código: ${project.inviteCode}`);
-  }
-}
 
 export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
   const proj = useProject(projectId);
@@ -57,17 +41,7 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
         <Proportions key={members.map((m) => m.userId + m.weight).join()} projectId={projectId} members={members} me={me} />
         <Categories projectId={projectId} categories={categories} onChange={proj.reload} />
 
-        <section className="card stack-sm">
-          <h2 className="card-title">Convite</h2>
-          <p className="muted small">
-            Código: <code>{project.inviteCode}</code>
-          </p>
-          <button className="btn ghost" onClick={() => shareInvite(project)}>
-            Compartilhar link de convite
-          </button>
-        </section>
-
-        <DangerZone project={project} me={me} />
+        <DangerZone project={project} />
       </main>
     </>
   );
@@ -304,7 +278,7 @@ function SuggestionsEditor(props: {
   );
 }
 
-function DangerZone({ project, me }: { project: Project; me: string }) {
+function DangerZone({ project }: { project: Project }) {
   async function act(fn: () => Promise<void>, ok: string) {
     try {
       await fn();
@@ -321,21 +295,15 @@ function DangerZone({ project, me }: { project: Project; me: string }) {
       <button className="btn ghost" onClick={() => act(() => updateProject(project.id, { archived: !project.archived }), project.archived ? "Projeto reativado" : "Projeto arquivado")}>
         {project.archived ? "Desarquivar projeto" : "Arquivar projeto"}
       </button>
-      {project.createdBy === me ? (
-        <button
-          className="btn danger"
-          onClick={() =>
-            prompt(`Isso apaga TODAS as despesas de “${project.name}” para os dois. Digite EXCLUIR para confirmar.`) === "EXCLUIR" &&
-            act(() => deleteProject(project.id), "Projeto excluído")
-          }
-        >
-          Excluir projeto
-        </button>
-      ) : (
-        <button className="btn danger" onClick={() => confirm("Sair deste projeto?") && act(() => leaveProject(project.id, me), "Você saiu do projeto")}>
-          Sair do projeto
-        </button>
-      )}
+      <button
+        className="btn danger"
+        onClick={() =>
+          prompt(`Isso apaga TODAS as despesas de “${project.name}” para os dois. Digite EXCLUIR para confirmar.`) === "EXCLUIR" &&
+          act(() => deleteProject(project.id), "Projeto excluído")
+        }
+      >
+        Excluir projeto
+      </button>
     </section>
   );
 }

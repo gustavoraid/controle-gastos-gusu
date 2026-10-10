@@ -19,7 +19,7 @@ Stack: Vite + React 19 + TypeScript + Supabase (Postgres, Auth, Realtime). Sem s
 ## 1. Criar o banco (Supabase, grátis)
 
 1. Crie um projeto em <https://supabase.com> (região São Paulo).
-2. **SQL Editor** → rode, em ordem, cada arquivo de `supabase/migrations/` (`0001_…`, `0002_…`).
+2. **SQL Editor** → rode, em ordem, cada arquivo de `supabase/migrations/` (`0001_…`, `0002_…`, `0003_…`).
 3. **Authentication → Sign In / Providers → Email**: desligue **Confirm email** (são só duas contas
    conhecidas, e o link de confirmação abre no navegador, não no app instalado).
 4. **Project Settings → API**: copie a `Project URL` e a chave `anon public`.
@@ -50,8 +50,12 @@ Recomendado: **Cloudflare Pages**, **Vercel** ou **Netlify** ligados a este repo
 - **iPhone (Safari)**: abra o link → Compartilhar → **Adicionar à Tela de Início**.
 - **Android (Chrome)**: abra o link → menu ⋮ → **Instalar app**.
 
-Depois: crie sua conta, crie o projeto, toque em **Enviar convite** e mande o link pelo WhatsApp.
-A outra pessoa cria a conta dela e entra pelo link. Ajuste a proporção em **Ajustes do projeto**.
+Depois: cada um cria a sua conta no app (o banco aceita **no máximo duas**). Todo projeto já nasce
+com vocês dois; quem criar a conta depois entra automaticamente nos projetos existentes. Ajuste a
+proporção em **Ajustes do projeto**.
+
+Depois que as duas contas existirem, desligue também **Authentication → Sign In / Providers →
+Allow new users to sign up** no Supabase (o limite de duas já está no banco; isso é uma segunda trava).
 
 ## Como a divisão funciona
 
@@ -68,7 +72,7 @@ A outra pessoa cria a conta dela e entra pelo link. Ajuste a proporção em **Aj
 
 ```
 profiles ─┐
-          ├─ project_members (peso na divisão) ── projects (nome, emoji, código de convite)
+          ├─ project_members (peso na divisão) ── projects (nome, emoji)
           │                                           │
           │                                           ├─ categories ── category_suggestions
           │                                           │

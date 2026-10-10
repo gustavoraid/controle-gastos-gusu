@@ -22,8 +22,8 @@ function translateError(msg: string): string {
   if (msg.includes("Password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
   if (msg.includes("Email not confirmed")) return "Confirme o e-mail antes de entrar.";
   if (msg.includes("category_suggestions_category_id_text_key")) return "Essa sugestão já existe.";
-  if (msg.includes("violates foreign key") && msg.includes("project_members"))
-    return "Essa pessoa tem lançamentos no projeto e não pode sair.";
+  if (msg.includes("Database error saving new user"))
+    return "Este app já tem as duas contas. Entre com seu e-mail e senha.";
   return msg;
 }
 
@@ -41,7 +41,6 @@ const mapProject = (r: any): Project => ({
   id: r.id,
   name: r.name,
   emoji: r.emoji,
-  inviteCode: r.invite_code,
   createdBy: r.created_by,
   archived: r.archived,
 });
@@ -157,20 +156,12 @@ export async function createProject(name: string, emoji: string, copyFrom: strin
   );
 }
 
-export async function joinProject(code: string) {
-  return check<string>(await supabase.rpc("join_project", { p_code: code }));
-}
-
 export async function updateProject(id: string, patch: { name?: string; emoji?: string; archived?: boolean }) {
   check(await supabase.from("projects").update(patch).eq("id", id));
 }
 
 export async function deleteProject(id: string) {
   check(await supabase.from("projects").delete().eq("id", id));
-}
-
-export async function leaveProject(id: string, me: string) {
-  check(await supabase.from("project_members").delete().eq("project_id", id).eq("user_id", me));
 }
 
 export async function setWeights(projectId: string, weights: Record<string, number>) {

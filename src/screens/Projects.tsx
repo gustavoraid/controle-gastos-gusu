@@ -45,7 +45,7 @@ export function Projects({ me }: { me: string }) {
             {data.length === 0 && (
               <div className="empty">
                 <p className="empty-emoji">👋</p>
-                <p>Crie um projeto (Casa, Viagem…) e convide quem vai dividir com você.</p>
+                <p>Crie um projeto (Casa, Viagem…). Ele já nasce com vocês dois.</p>
               </div>
             )}
 
@@ -70,14 +70,9 @@ export function Projects({ me }: { me: string }) {
               </>
             )}
 
-            <div className="row gap">
-              <button className="btn primary grow" onClick={() => go("/novo")}>
-                + Novo projeto
-              </button>
-              <button className="btn ghost grow" onClick={() => go("/entrar")}>
-                Tenho um convite
-              </button>
-            </div>
+            <button className="btn primary big" onClick={() => go("/novo")}>
+              + Novo projeto
+            </button>
           </>
         )}
       </main>
@@ -94,7 +89,7 @@ function ProjectRow({ p, me }: { p: ProjectSummary; me: string }) {
         <span className="grow">
           <strong>{p.name}</strong>
           <span className="muted small row gap-sm">
-            {others.length === 0 ? "Só você por enquanto" : others.map((m) => <Avatar key={m.userId} name={m.name} size={18} />)}
+            {others.length === 0 ? "Falta a segunda conta" : others.map((m) => <Avatar key={m.userId} name={m.name} size={18} />)}
             {others.length > 0 && others.map((m) => m.name).join(", ")}
           </span>
         </span>

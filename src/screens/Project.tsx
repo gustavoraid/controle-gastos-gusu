@@ -10,7 +10,6 @@ import { formatBRL } from "@/lib/money";
 import { expenseShares, weightsToPercents } from "@/lib/split";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
-import { shareInvite } from "@/screens/ProjectSettings";
 
 type Item = { kind: "e"; date: string; at: string; e: Expense } | { kind: "s"; date: string; at: string; s: Settlement };
 
@@ -57,11 +56,9 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         {members.length < 2 && (
           <section className="invite-card">
             <p>
-              <strong>Só você aqui.</strong> Mande o convite para quem vai dividir os gastos.
+              <strong>Falta a segunda conta.</strong> Quando a outra pessoa criar a conta dela no app, ela entra
+              automaticamente em todos os projetos.
             </p>
-            <button className="btn primary" onClick={() => shareInvite(project)}>
-              Enviar convite
-            </button>
           </section>
         )}
 

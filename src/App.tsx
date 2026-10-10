@@ -6,7 +6,7 @@ import { supabaseConfigured } from "@/lib/supabase";
 import { getLastProject } from "@/lib/storage";
 import { ExpenseForm } from "@/screens/ExpenseForm";
 import { Login } from "@/screens/Login";
-import { JoinProject, NewProject } from "@/screens/NewProject";
+import { NewProject } from "@/screens/NewProject";
 import { ProjectScreen } from "@/screens/Project";
 import { ProjectSettings } from "@/screens/ProjectSettings";
 import { Projects } from "@/screens/Projects";
@@ -51,7 +51,6 @@ function Routes() {
   const [a, b, c] = parts;
 
   if (a === "novo") return <NewProject me={me} />;
-  if (a === "entrar") return <JoinProject code={b} />;
   if (a === "p" && b) {
     if (c === "add") return <ExpenseForm projectId={b} expenseId={params.get("e")} me={me} />;
     if (c === "acertar") return <Settle projectId={b} me={me} />;
