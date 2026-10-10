@@ -1,6 +1,6 @@
 -- Gastos do Casal — schema completo.
--- Rode uma vez no SQL Editor de um projeto Supabase novo, DEPOIS de criar as duas
--- contas em Authentication → Users → Add user (veja o README).
+-- Rode uma vez no SQL Editor de um projeto Supabase novo. Pode ser antes ou depois de
+-- criar as duas contas em Authentication → Users → Add user (veja o README).
 
 create extension if not exists pgcrypto;
 
@@ -288,6 +288,14 @@ $$;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user ();
+
+-- Contas criadas antes deste script não passaram pelo gatilho: cria os perfis delas.
+insert into public.profiles (id, display_name)
+select id, coalesce(nullif(trim(raw_user_meta_data ->> 'display_name'), ''), split_part(email, '@', 1))
+from auth.users
+order by created_at
+limit 2
+on conflict (id) do nothing;
 
 -- Cria o projeto já com as duas pessoas. Com p_copy_from, copia proporção, moedas,
 -- categorias e sugestões de outro projeto; sem, usa a base padrão de casa

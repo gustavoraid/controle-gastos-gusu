@@ -35,8 +35,8 @@ Stack: Vite + React 19 + TypeScript + Supabase (Postgres, Auth, Realtime). Sem s
    update profiles set display_name = 'Nome dela' where id = (select id from auth.users where email = 'dela@email.com');
    ```
 
-   > Se rodar o passo 4 antes do 3, sem problema: os perfis são criados quando as contas forem
-   > criadas. O que o banco não deixa é criar projeto antes de existirem as duas contas.
+   > A ordem entre os passos 3 e 4 não importa: o SQL cria os perfis das contas que já existirem, e
+   > as criadas depois ganham perfil na hora. O banco só não deixa criar projeto antes das duas.
 
 6. **Project Settings → API**: copie a `Project URL` e a chave `anon public`.
 
