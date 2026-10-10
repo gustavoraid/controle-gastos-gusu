@@ -46,17 +46,21 @@ npm run dev
 npm test               # lógica de divisão, saldos, valores e datas
 ```
 
-## 3. Publicar (grátis)
+## 3. Publicar (GitHub Pages, grátis)
 
-Qualquer hospedagem estática serve; o app usa caminhos relativos e rotas com `#`.
-Recomendado: **Cloudflare Pages**, **Vercel** ou **Netlify** ligados a este repositório:
+O workflow `.github/workflows/deploy.yml` roda os testes em todo PR e publica a cada merge na `main`.
+Configuração única no GitHub (o repositório precisa ser **público** para o Pages ser grátis — só o
+código fica visível; os dados ficam no Supabase, protegidos pelo RLS):
 
-- Build command: `npm run build`
-- Output directory: `dist`
-- Variáveis de ambiente: `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`
+1. **Settings → General → Danger Zone → Change visibility → Public**.
+2. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. **Settings → Secrets and variables → Actions → aba Variables → New repository variable**:
+   `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+4. **Actions → Testes e publicação → Run workflow** (ou faça um merge na `main`).
 
-> A chave `anon` é pública por design. Quem protege os dados é o RLS do Postgres (cada pessoa só
-> enxerga projetos de que é membro). Nunca coloque a chave `service_role` no app.
+Endereço: `https://<usuário>.github.io/controle-gastos-gusu/`.
+
+> A chave `anon` é pública por design. Nunca coloque a chave `service_role` no app nem no GitHub.
 
 ## 4. Instalar no celular
 
