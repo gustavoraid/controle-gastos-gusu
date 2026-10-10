@@ -7,7 +7,6 @@ import { deleteExpense, getExpense, newId, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { currencyDecimals, formatMoney, minorToInput, parseAmountMinor, toBrlCents } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
-import { expenseShares, percentLabels } from "@/lib/split";
 import type { Category, Expense, Member, ProjectCurrency } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
@@ -77,27 +76,17 @@ function Form(props: {
   const cents = minor ? toBrlCents(minor, currency, rate) : null;
   const foreign = currency !== "BRL";
   const desc = description.trim();
-  const lines = cents ? expenseShares(cents, members) : [];
   const category = categories.find((c) => c.id === categoryId);
-  const pct = percentLabels(members);
-  const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const today = todayISO();
   const yesterday = addDaysISO(today, -1);
   const dayBefore = addDaysISO(today, -2);
 
   const otherDate = ![today, yesterday, dayBefore].includes(date);
-  // Conversão e divisão em texto pequeno logo abaixo do valor (uma linha cada).
+  // Conversão em texto pequeno logo abaixo do valor (só em moeda estrangeira).
   const info: string[] = [];
   if (foreign) {
     const rateText = `1 ${currency} = R$ ${String(rate).replace(".", ",")}`;
     info.push(cents ? `≈ ${formatBRL(cents)} · ${rateText}` : rateText);
-  }
-  if (members.length > 1) {
-    info.push(
-      cents
-        ? lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" / ")
-        : `Divisão ${pct.join(" / ")}`,
-    );
   }
 
   function pickCategory(id: string) {
@@ -197,7 +186,9 @@ function Form(props: {
           </p>
         )}
 
-        <div className="cat-chips" role="group" aria-label="Categoria">
+        <div className="field">
+          <span>Categoria</span>
+          <div className="cat-chips" role="group" aria-label="Categoria">
           {categories.map((c) => (
             <button
               type="button"
@@ -209,14 +200,16 @@ function Form(props: {
               <span aria-hidden="true">{c.emoji}</span> {c.name}
             </button>
           ))}
+          </div>
         </div>
 
-        <div className="stack-sm">
+        <div className="field">
+          <span>Descrição</span>
           <input
             ref={descRef}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={category?.suggestions.length ? "Descrição: toque numa sugestão ou escreva" : "Descrição (ex.: Jantar, Táxi)"}
+            placeholder={category?.suggestions.length ? "Toque numa sugestão ou escreva" : "Ex.: Jantar, Táxi, Mercado"}
             maxLength={120}
             aria-label="Descrição"
             aria-required="true"
@@ -235,9 +228,9 @@ function Form(props: {
         </div>
 
         {members.length > 1 && (
-          <div className="row gap-sm">
-            <span className="muted small">Pagou:</span>
-            <div className="segmented grow">
+          <div className="field">
+            <span>Quem pagou</span>
+            <div className="segmented">
               {members.map((m) => (
                 <button type="button" key={m.userId} className={paidBy === m.userId ? "active" : ""} onClick={() => setPaidBy(m.userId)}>
                   {m.userId === me ? "Eu" : m.name}
@@ -247,7 +240,9 @@ function Form(props: {
           </div>
         )}
 
-        <div className="chips" role="group" aria-label="Data">
+        <div className="field">
+          <span>Quando</span>
+          <div className="chips" role="group" aria-label="Data">
           <Chip active={date === today} onClick={() => setDate(today)}>
             Hoje
           </Chip>
@@ -262,6 +257,7 @@ function Form(props: {
             📅 {otherDate ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : "Outra"}
             <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
           </label>
+          </div>
         </div>
 
         <div className="sticky-actions">
