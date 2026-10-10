@@ -235,8 +235,26 @@ export async function getExpense(id: string): Promise<Expense> {
   );
 }
 
+/**
+ * Insere com ID gerado no celular. Se a mesma linha chegar duas vezes (resposta
+ * perdida com sinal ruim e o usuário tenta de novo, ou a fila offline reenviando),
+ * a segunda é reconhecida pelo ID e ignorada em vez de duplicar.
+ */
+async function insertOnce(table: "expenses" | "settlements", row: Record<string, unknown>) {
+  const { error } = await supabase.from(table).insert(row);
+  if (error && !(error.code === "23505" && error.message.includes(`${table}_pkey`))) {
+    throw new Error(translateError(error.message));
+  }
+}
+
+/** ID novo para uma despesa/acerto, gerado uma vez por formulário. */
+export function newId(): string {
+  return crypto.randomUUID();
+}
+
 export async function saveExpense(input: {
-  id: string | null;
+  id: string;
+  isNew: boolean;
   projectId: string;
   description: string;
   amountCents: number;
@@ -245,6 +263,7 @@ export async function saveExpense(input: {
   spentOn: string;
 }) {
   const row = {
+    id: input.id,
     project_id: input.projectId,
     description: input.description,
     amount_cents: input.amountCents,
@@ -252,10 +271,10 @@ export async function saveExpense(input: {
     category_id: input.categoryId,
     spent_on: input.spentOn,
   };
-  if (input.id) {
-    check(await supabase.from("expenses").update({ ...row, updated_at: new Date().toISOString() }).eq("id", input.id));
+  if (input.isNew) {
+    await insertOnce("expenses", row);
   } else {
-    check(await supabase.from("expenses").insert(row));
+    check(await supabase.from("expenses").update({ ...row, updated_at: new Date().toISOString() }).eq("id", input.id));
   }
 }
 
@@ -287,6 +306,7 @@ export async function deleteExpense(id: string) {
 }
 
 export async function addSettlement(input: {
+  id: string;
   projectId: string;
   fromUser: string;
   toUser: string;
@@ -294,16 +314,15 @@ export async function addSettlement(input: {
   settledOn: string;
   me: string;
 }) {
-  check(
-    await supabase.from("settlements").insert({
-      project_id: input.projectId,
-      from_user: input.fromUser,
-      to_user: input.toUser,
-      amount_cents: input.amountCents,
-      settled_on: input.settledOn,
-      created_by: input.me,
-    }),
-  );
+  await insertOnce("settlements", {
+    id: input.id,
+    project_id: input.projectId,
+    from_user: input.fromUser,
+    to_user: input.toUser,
+    amount_cents: input.amountCents,
+    settled_on: input.settledOn,
+    created_by: input.me,
+  });
 }
 
 export async function deleteSettlement(id: string) {

@@ -3,7 +3,7 @@ import { Chip, ErrorBox, Header, Loading, haptic, toast } from "@/components/ui"
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
-import { deleteExpense, getExpense, saveExpense } from "@/lib/api";
+import { deleteExpense, getExpense, newId, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
@@ -48,6 +48,8 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
   const [paidBy, setPaidBy] = useState(existing?.paidBy ?? (isMember ? me : members[0]?.userId));
   const [date, setDate] = useState(existing?.spentOn ?? todayISO());
   const [busy, setBusy] = useState(false);
+  // Fixo enquanto o formulário está aberto: tentar salvar de novo não duplica.
+  const [draftId] = useState(newId);
   const amountRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +83,8 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
     setBusy(true);
     try {
       await saveExpense({
-        id: existing?.id ?? null,
+        id: existing?.id ?? draftId,
+        isNew: !existing,
         projectId,
         description: desc,
         amountCents: cents,
