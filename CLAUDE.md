@@ -6,8 +6,10 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
 
 - Stack: Vite + React 19 + TS + Supabase. Sem backend próprio: regras de acesso no RLS. Schema em
   `supabase/migrations/`.
-- Migration nova não é aplicada sozinha: o dono roda no SQL Editor. Não cole o SQL a cada ajuste;
-  só quando ele pedir ou ao fechar a rodada de mudanças.
+- Banco em produção (projeto Supabase `controle-gastos-gusu`) já tem `0001` e `0002` aplicados:
+  mudança de schema daqui em diante é sempre uma migration NOVA, nunca edição das antigas. Com o
+  conector do Supabase na sessão, aplique com `apply_migration` depois de testar localmente; sem
+  ele, o dono roda no SQL Editor (cole o SQL só quando ele pedir ou ao fechar a rodada).
 - Lógica pura em `src/lib/*.ts` com testes Vitest (`npm test`, fuso fixo America/Sao_Paulo).
   Mexeu em divisão/saldo/valor/data → atualize o teste junto.
 - A proporção de divisão é do projeto (`project_members.weight`) e é recalculada retroativamente
