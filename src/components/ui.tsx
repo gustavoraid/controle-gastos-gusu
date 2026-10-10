@@ -19,12 +19,15 @@ export function Header(props: { title: ReactNode; onBack?: () => void; action?: 
   );
 }
 
-export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+/** Cores fixas das duas pessoas (ordem dos membros), bem distintas para bater o olho. */
+export const PERSON_COLORS = ["hsl(212 75% 52%)", "hsl(330 70% 55%)"];
+
+export function Avatar({ name, size = 36, color }: { name: string; size?: number; color?: string }) {
   const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
   return (
     <span
       className="avatar"
-      style={{ width: size, height: size, fontSize: size * 0.42, background: `hsl(${hue} 55% 45%)` }}
+      style={{ width: size, height: size, fontSize: size * 0.42, background: color ?? `hsl(${hue} 55% 45%)` }}
       aria-hidden="true"
     >
       {name.trim().charAt(0).toUpperCase() || "?"}

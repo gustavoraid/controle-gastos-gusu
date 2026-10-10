@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { Avatar, ErrorBox, Header, Loading, Money, toast } from "@/components/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Avatar, ErrorBox, Header, Loading, Money, PERSON_COLORS, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
-import { deleteSettlement, listMonth } from "@/lib/api";
-import { expenseImpact, suggestTransfers } from "@/lib/balances";
+import { deleteSettlement, listActivity } from "@/lib/api";
+import { suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
@@ -17,15 +17,26 @@ type Item = { kind: "e"; date: string; at: string; e: Expense } | { kind: "s"; d
 export function ProjectScreen({ id, me }: { id: string; me: string }) {
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [tab, setTab] = useState<"lista" | "resumo">("lista");
-  const range = monthRange(month);
-  const activity = useLoad(() => listMonth(id, range.start, range.end), [id, month]);
-  const proj = useProject(id, activity.reload);
+  const reloadActivity = useRef<() => void>(undefined);
+  const proj = useProject(id, () => reloadActivity.current?.());
+  // Viagem mostra tudo de uma vez (sem navegação por mês); os outros tipos, mês a mês.
+  const type = proj.data?.project.type;
+  const isTrip = type === "viagem";
+  const activity = useLoad(
+    () => (type ? listActivity(id, isTrip ? undefined : monthRange(month)) : Promise.resolve(null)),
+    [id, month, type],
+  );
+  reloadActivity.current = activity.reload;
 
   useEffect(() => setLastProject(id), [id]);
 
   const data = proj.data;
   const names = useMemo(() => new Map(data?.members.map((m) => [m.userId, m.name]) ?? []), [data]);
   const cats = useMemo(() => new Map(data?.categories.map((c) => [c.id, c]) ?? []), [data]);
+  const colors = useMemo(
+    () => new Map(data?.members.map((m, i) => [m.userId, PERSON_COLORS[i % PERSON_COLORS.length]]) ?? []),
+    [data],
+  );
 
   if (proj.error) {
     return (
@@ -56,6 +67,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
       <main className="page with-fab">
         <BalanceBanner me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
 
+        {!isTrip && (
         <nav className="month-nav">
           <button className="icon-btn" aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
             ‹
@@ -65,13 +77,14 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             ›
           </button>
         </nav>
+        )}
 
         <div className="segmented" role="tablist">
           <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")}>
             Lançamentos
           </button>
           <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")}>
-            Resumo do mês
+            {isTrip ? "Resumo" : "Resumo do mês"}
           </button>
         </div>
 
@@ -83,9 +96,11 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             projectId={id}
             members={members}
             names={names}
+            colors={colors}
             cats={cats}
             expenses={activity.data.expenses}
             settlements={activity.data.settlements}
+            emptyText={isTrip ? "Nada lançado nesta viagem ainda." : "Nada lançado neste mês."}
             onChanged={() => {
               activity.reload();
               proj.reload();
@@ -93,7 +108,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           />
         )}
         {activity.data && tab === "resumo" && (
-          <MonthSummary members={members} cats={cats} expenses={activity.data.expenses} />
+          <MonthSummary members={members} cats={cats} expenses={activity.data.expenses} isTrip={isTrip} />
         )}
       </main>
 
@@ -148,9 +163,11 @@ function ActivityList(props: {
   projectId: string;
   members: Member[];
   names: Map<string, string>;
+  colors: Map<string, string>;
   cats: Map<string, Category>;
   expenses: Expense[];
   settlements: Settlement[];
+  emptyText: string;
   onChanged: () => void;
 }) {
   const { me, names, cats } = props;
@@ -163,7 +180,7 @@ function ActivityList(props: {
     return (
       <div className="empty">
         <p className="empty-emoji">🧾</p>
-        <p>Nada lançado neste mês.</p>
+        <p>{props.emptyText}</p>
       </div>
     );
   }
@@ -195,18 +212,21 @@ function ActivityList(props: {
           <ul className="list">
             {g.items.map((it) =>
               it.kind === "e" ? (
-                <ExpenseRow key={it.e.id} e={it.e} me={me} members={props.members} names={names} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
+                <ExpenseRow key={it.e.id} e={it.e} me={me} names={names} color={props.colors.get(it.e.paidBy)} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
               ) : (
                 <li key={it.s.id}>
-                  <button className="list-item" onClick={() => removeSettlement(it.s)}>
-                    <span className="cat-badge settle">💸</span>
-                    <span className="grow">
-                      <strong>
-                        {names.get(it.s.fromUser)} pagou {names.get(it.s.toUser)}
-                      </strong>
-                      <span className="muted small">Acerto de contas</span>
+                  <button className="list-item compact" onClick={() => removeSettlement(it.s)}>
+                    <span className="cat-badge sm settle">💸</span>
+                    <span className="grow min0">
+                      <strong className="ellipsis">Acerto de contas</strong>
+                      <span className="payer small">
+                        <Avatar name={names.get(it.s.fromUser) ?? "?"} size={16} color={props.colors.get(it.s.fromUser)} />
+                        {it.s.fromUser === me ? "Você" : names.get(it.s.fromUser)} → {it.s.toUser === me ? "você" : names.get(it.s.toUser)}
+                      </span>
                     </span>
-                    <Money cents={it.s.amountCents} />
+                    <span className="amount-col">
+                      <Money cents={it.s.amountCents} />
+                    </span>
                   </button>
                 </li>
               ),
@@ -218,44 +238,39 @@ function ActivityList(props: {
   );
 }
 
-function ExpenseRow(props: { e: Expense; me: string; members: Member[]; names: Map<string, string>; cat?: Category; projectId: string }) {
+function ExpenseRow(props: {
+  e: Expense;
+  me: string;
+  names: Map<string, string>;
+  color?: string;
+  cat?: Category;
+  projectId: string;
+}) {
   const { e, me, names, cat } = props;
-  const shares = expenseShares(e.amountCents, props.members);
-  const impact = expenseImpact(e, shares, me);
-  const involved = e.paidBy === me || shares.some((s) => s.userId === me && s.amountCents > 0);
-  const payer = e.paidBy === me ? "Você" : names.get(e.paidBy) ?? "?";
+  const payerName = names.get(e.paidBy) ?? "?";
 
   return (
     <li>
-      <button className="list-item" onClick={() => go(`/p/${props.projectId}/add?e=${e.id}`)}>
-        <span className="cat-badge">{cat?.emoji ?? "📦"}</span>
+      <button className="list-item compact" onClick={() => go(`/p/${props.projectId}/add?e=${e.id}`)}>
+        <span className="cat-badge sm">{cat?.emoji ?? "📦"}</span>
         <span className="grow min0">
           <strong className="ellipsis">{e.description}</strong>
-          <span className="muted small">
-            {payer} pagou{" "}
-            {e.currency === "BRL"
-              ? formatBRL(e.amountCents)
-              : `${formatMoney(e.amount, e.currency)} (≈ ${formatBRL(e.amountCents)})`}
+          {/* bolinha com a inicial na cor da pessoa: dá para ver quem pagou de relance */}
+          <span className="payer small">
+            <Avatar name={payerName} size={16} color={props.color} />
+            {e.paidBy === me ? "Você" : payerName}
           </span>
         </span>
-        <span className="impact">
-          {!involved ? (
-            <span className="muted small">não envolve você</span>
-          ) : impact === 0 ? (
-            <span className="muted small">sem dívida</span>
-          ) : (
-            <>
-              <span className={`small ${impact > 0 ? "pos" : "neg"}`}>{impact > 0 ? "você emprestou" : "você deve"}</span>
-              <Money cents={Math.abs(impact)} tone={impact > 0 ? "pos" : "neg"} />
-            </>
-          )}
+        <span className="amount-col">
+          <span className="money">{formatMoney(e.amount, e.currency)}</span>
+          {e.currency !== "BRL" && <span className="muted small">≈ {formatBRL(e.amountCents)}</span>}
         </span>
       </button>
     </li>
   );
 }
 
-function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; expenses: Expense[] }) {
+function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; expenses: Expense[]; isTrip: boolean }) {
   const { members, cats, expenses } = props;
   const total = expenses.reduce((acc, e) => acc + e.amountCents, 0);
 
@@ -292,7 +307,7 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
   return (
     <div className="stack">
       <section className="total-card">
-        <span className="muted">Total gasto no mês</span>
+        <span className="muted">{props.isTrip ? "Total da viagem" : "Total gasto no mês"}</span>
         <span className="money big">{formatBRL(total)}</span>
         <span className="muted small">{expenses.length} despesa{expenses.length > 1 ? "s" : ""}</span>
         {foreignTotals.length > 0 && (
@@ -313,11 +328,11 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
             </tr>
           </thead>
           <tbody>
-            {people.map(({ m, paid, share }) => (
+            {people.map(({ m, paid, share }, i) => (
               <tr key={m.userId}>
                 <td>
                   <span className="row gap-sm">
-                    <Avatar name={m.name} size={24} /> {m.name}
+                    <Avatar name={m.name} size={24} color={PERSON_COLORS[i % PERSON_COLORS.length]} /> {m.name}
                   </span>
                 </td>
                 <td>{formatBRL(paid)}</td>
