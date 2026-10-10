@@ -29,7 +29,7 @@ export function Projects({ me }: { me: string }) {
 
   return (
     <>
-      <Header title="Gastos do Casal" action={menu} />
+      <Header title="Gastos GuSu" action={menu} />
       <main className="page">
         {error && <ErrorBox message={error} onRetry={reload} />}
         {!data && !error && <Loading />}
