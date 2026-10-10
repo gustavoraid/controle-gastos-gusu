@@ -299,9 +299,6 @@ code {
   color: var(--brand-strong);
   font-weight: 600;
 }
-.date-chip {
-  padding: 6px 10px;
-}
 .emoji-lg {
   font-size: 22px;
   line-height: 1;
@@ -359,12 +356,6 @@ input:focus,
 select:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--brand-soft);
-}
-.chip.date-chip {
-  width: auto;
-  min-height: 40px;
-  padding: 6px 12px;
-  border-radius: 999px;
 }
 
 .radio-card {
@@ -629,40 +620,7 @@ select:focus {
   text-align: center;
   margin-top: -8px;
 }
-.desc-input {
-  text-align: center;
-}
 
-.cat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-  gap: 8px;
-}
-.cat-pick {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 4px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  min-height: 72px;
-}
-.cat-pick.active {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-}
-.cat-name {
-  font-size: 12px;
-  line-height: 1.2;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  white-space: nowrap;
-}
 
 .split-summary {
   width: 100%;
@@ -685,9 +643,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.split-preview {
-  text-align: center;
 }
 .exact-row input {
   width: 9rem !important;
@@ -852,4 +807,63 @@ select:focus {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ------------------------------------------------------------ lançamento compacto */
+
+.expense-form.compact {
+  gap: 12px;
+}
+.expense-form.compact .amount-field {
+  padding: 4px 0 0;
+  align-items: center;
+}
+.expense-form.compact .amount-field input {
+  font-size: 42px !important;
+}
+.expense-form.compact .conversion {
+  margin-top: -6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.currency-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--brand-strong);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.currency-btn span {
+  font-size: 12px;
+}
+.cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cat-chip {
+  min-height: 38px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+.date-pick {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+}
+.date-pick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  cursor: pointer;
 }
