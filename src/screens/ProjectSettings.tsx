@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { Avatar, ErrorBox, Header, Loading, toast } from "@/components/ui";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
@@ -82,7 +83,6 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
   );
 }
 
-const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚"];
 
 function ProjectInfo({ project }: { project: Project }) {
   const [name, setName] = useState(project.name);
@@ -102,14 +102,8 @@ function ProjectInfo({ project }: { project: Project }) {
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Projeto</h2>
-      <div className="row gap-sm">
-        <select className="emoji-select" value={emoji} onChange={(e) => setEmoji(e.target.value)} aria-label="Ícone">
-          {[...new Set([emoji, ...EMOJIS])].map((e) => (
-            <option key={e}>{e}</option>
-          ))}
-        </select>
-        <input className="grow" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome do projeto" />
-      </div>
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome do projeto" />
+      <EmojiPicker value={emoji} onChange={setEmoji} />
       <div className="segmented" aria-label="Tipo do projeto">
         {PROJECT_TYPES.map((t) => (
           <button type="button" key={t.id} className={type === t.id ? "active" : ""} onClick={() => setType(t.id)}>

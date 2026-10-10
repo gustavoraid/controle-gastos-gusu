@@ -729,11 +729,6 @@ select:focus {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.emoji-select {
-  width: 4.5rem !important;
-  font-size: 22px !important;
-  text-align: center;
-}
 .emoji-input {
   width: 3.4rem !important;
   text-align: center;
