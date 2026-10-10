@@ -6,7 +6,8 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
 
 - Stack: Vite + React 19 + TS + Supabase. Sem backend próprio: regras de acesso no RLS. Schema em
   `supabase/migrations/`.
-- Migration nova não é aplicada sozinha: cole o SQL na conversa para o dono rodar no SQL Editor.
+- Migration nova não é aplicada sozinha: o dono roda no SQL Editor. Não cole o SQL a cada ajuste;
+  só quando ele pedir ou ao fechar a rodada de mudanças.
 - Lógica pura em `src/lib/*.ts` com testes Vitest (`npm test`, fuso fixo America/Sao_Paulo).
   Mexeu em divisão/saldo/valor/data → atualize o teste junto.
 - A proporção de divisão é do projeto (`project_members.weight`) e é recalculada retroativamente
