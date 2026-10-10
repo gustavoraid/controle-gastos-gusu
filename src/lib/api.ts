@@ -1,5 +1,13 @@
 import { supabase } from "@/lib/supabase";
-import type { Category, Expense, Member, Project, ProjectSummary, Settlement } from "@/lib/types";
+import type {
+  Category,
+  Expense,
+  Member,
+  Project,
+  ProjectSummary,
+  Settlement,
+  Suggestion,
+} from "@/lib/types";
 
 const FETCH_BATCH = 1000;
 
@@ -13,6 +21,7 @@ function translateError(msg: string): string {
   if (msg.includes("User already registered")) return "Esse e-mail já tem conta. Entre com a senha.";
   if (msg.includes("Password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
   if (msg.includes("Email not confirmed")) return "Confirme o e-mail antes de entrar.";
+  if (msg.includes("category_suggestions_category_id_text_key")) return "Essa sugestão já existe.";
   if (msg.includes("violates foreign key") && msg.includes("project_members"))
     return "Essa pessoa tem lançamentos no projeto e não pode sair.";
   return msg;
@@ -35,6 +44,7 @@ const mapProject = (r: any): Project => ({
   inviteCode: r.invite_code,
   createdBy: r.created_by,
   archived: r.archived,
+  template: r.template ?? "casa",
 });
 
 const mapMembers = (rows: any[]): Member[] =>
@@ -114,7 +124,11 @@ export async function getProject(id: string) {
       .single(),
   );
   const cats = check<any[]>(
-    await supabase.from("categories").select("*").eq("project_id", id).order("position"),
+    await supabase
+      .from("categories")
+      .select("*, category_suggestions(id, text, position)")
+      .eq("project_id", id)
+      .order("position"),
   );
   return {
     project: mapProject(r),
@@ -126,6 +140,9 @@ export async function getProject(id: string) {
         emoji: c.emoji,
         position: c.position,
         archived: c.archived,
+        suggestions: (c.category_suggestions ?? [])
+          .map((sg: any) => ({ id: sg.id, text: sg.text, position: sg.position }))
+          .sort((a: Suggestion, b: Suggestion) => a.position - b.position || a.text.localeCompare(b.text)),
       }),
     ),
   };
@@ -184,6 +201,14 @@ export async function updateCategory(id: string, patch: Partial<Pick<Category, "
 
 export async function deleteCategory(id: string) {
   check(await supabase.from("categories").delete().eq("id", id));
+}
+
+export async function addSuggestion(categoryId: string, text: string, position: number) {
+  check(await supabase.from("category_suggestions").insert({ category_id: categoryId, text, position }));
+}
+
+export async function deleteSuggestion(id: string) {
+  check(await supabase.from("category_suggestions").delete().eq("id", id));
 }
 
 // ---------------------------------------------------------------- despesas

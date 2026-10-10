@@ -4,8 +4,10 @@ import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
 import {
   addCategory,
+  addSuggestion,
   deleteCategory,
   deleteProject,
+  deleteSuggestion,
   leaveProject,
   setWeights,
   updateCategory,
@@ -128,7 +130,7 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Proporção da divisão</h2>
-      <p className="muted small">Quanto cada um assume das despesas deste projeto. Despesas já lançadas não mudam.</p>
+      <p className="muted small">Toda despesa deste projeto é dividida assim. Mudar aqui vale para os próximos lançamentos; os já lançados continuam como foram.</p>
       {members.length === 2 && (
         <input type="range" min={0} max={100} step={5} value={pct[0]} onChange={(e) => setAt(0, Number(e.target.value))} aria-label={`Parte de ${members[0].name}`} className="slider" />
       )}
@@ -170,14 +172,17 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
 function Categories({ projectId, categories, onChange }: { projectId: string; categories: Category[]; onChange: () => void }) {
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🏷️");
+  const [open, setOpen] = useState<string | null>(null);
 
   async function run(fn: () => Promise<void>, ok?: string) {
     try {
       await fn();
       if (ok) toast.ok(ok);
       onChange();
+      return true;
     } catch (err) {
       toast.err((err as Error).message);
+      return false;
     }
   }
 
@@ -185,31 +190,35 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
 
   return (
     <section className="card stack-sm">
-      <h2 className="card-title">Categorias</h2>
+      <h2 className="card-title">Categorias e descrições sugeridas</h2>
+      <p className="muted small">As sugestões aparecem como atalho ao lançar uma despesa na categoria.</p>
       <ul className="cat-edit-list">
         {categories.map((c) => (
-          <li key={c.id + c.name + c.emoji} className={c.archived ? "dim" : ""}>
-            <input className="emoji-input" defaultValue={c.emoji} aria-label="Emoji" onBlur={(e) => e.target.value.trim() && e.target.value !== c.emoji && run(() => updateCategory(c.id, { emoji: e.target.value.trim() }))} />
-            <input className="grow" defaultValue={c.name} aria-label="Nome da categoria" maxLength={40} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(() => updateCategory(c.id, { name: e.target.value.trim() }), "Categoria renomeada")} />
-            <button className="btn small ghost" onClick={() => run(() => updateCategory(c.id, { archived: !c.archived }))} title={c.archived ? "Mostrar no lançamento" : "Esconder do lançamento"}>
-              {c.archived ? "Mostrar" : "Ocultar"}
-            </button>
-            <button
-              className="icon-btn danger"
-              aria-label={`Excluir ${c.name}`}
-              onClick={() => confirm(`Excluir “${c.name}”? As despesas dela ficam sem categoria.`) && run(() => deleteCategory(c.id), "Categoria excluída")}
-            >
-              ×
-            </button>
+          <li key={c.id} className={c.archived ? "dim" : ""}>
+            <div className="cat-edit-row">
+              <input key={c.emoji} className="emoji-input" defaultValue={c.emoji} aria-label="Emoji" onBlur={(e) => e.target.value.trim() && e.target.value !== c.emoji && run(() => updateCategory(c.id, { emoji: e.target.value.trim() }))} />
+              <input key={c.name} className="grow" defaultValue={c.name} aria-label="Nome da categoria" maxLength={40} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(() => updateCategory(c.id, { name: e.target.value.trim() }), "Categoria renomeada")} />
+              <button className="btn small ghost" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
+                {c.suggestions.length} {open === c.id ? "▲" : "▼"}
+              </button>
+            </div>
+            {open === c.id && (
+              <SuggestionsEditor
+                category={c}
+                run={run}
+                onArchive={() => run(() => updateCategory(c.id, { archived: !c.archived }))}
+                onDelete={() => confirm(`Excluir “${c.name}”? As despesas dela ficam sem categoria.`) && run(() => deleteCategory(c.id), "Categoria excluída")}
+              />
+            )}
           </li>
         ))}
       </ul>
       <form
         className="row gap-sm"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!newName.trim()) return;
-          run(() => addCategory(projectId, newName.trim(), newEmoji.trim() || "🏷️", nextPos), "Categoria criada").then(() => setNewName(""));
+          if (await run(() => addCategory(projectId, newName.trim(), newEmoji.trim() || "🏷️", nextPos), "Categoria criada")) setNewName("");
         }}
       >
         <input className="emoji-input" value={newEmoji} onChange={(e) => setNewEmoji(e.target.value)} aria-label="Emoji da nova categoria" />
@@ -219,6 +228,57 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
         </button>
       </form>
     </section>
+  );
+}
+
+function SuggestionsEditor(props: {
+  category: Category;
+  run: (fn: () => Promise<void>, ok?: string) => Promise<boolean>;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const { category: c, run } = props;
+  const [text, setText] = useState("");
+  const nextPos = Math.max(0, ...c.suggestions.map((s) => s.position)) + 1;
+
+  return (
+    <div className="suggestions-editor">
+      {c.suggestions.length === 0 ? (
+        <p className="muted small">Nenhuma sugestão ainda.</p>
+      ) : (
+        <div className="chips">
+          {c.suggestions.map((sg) => (
+            <span key={sg.id} className="chip removable">
+              {sg.text}
+              <button type="button" aria-label={`Remover ${sg.text}`} onClick={() => run(() => deleteSuggestion(sg.id))}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <form
+        className="row gap-sm"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!text.trim()) return;
+          if (await run(() => addSuggestion(c.id, text.trim(), nextPos))) setText("");
+        }}
+      >
+        <input className="grow" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nova sugestão" maxLength={120} />
+        <button className="btn primary small" disabled={!text.trim()}>
+          Adicionar
+        </button>
+      </form>
+      <div className="row gap-sm">
+        <button className="btn small ghost" onClick={props.onArchive}>
+          {c.archived ? "Mostrar no lançamento" : "Ocultar do lançamento"}
+        </button>
+        <button className="btn small danger" onClick={props.onDelete}>
+          Excluir categoria
+        </button>
+      </div>
+    </div>
   );
 }
 

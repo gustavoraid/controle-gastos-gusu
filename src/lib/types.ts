@@ -11,6 +11,7 @@ export interface Project {
   inviteCode: string;
   createdBy: string;
   archived: boolean;
+  template: "casa" | "viagem" | "vazio";
 }
 
 export interface Category {
@@ -19,6 +20,13 @@ export interface Category {
   emoji: string;
   position: number;
   archived: boolean;
+  suggestions: Suggestion[];
+}
+
+export interface Suggestion {
+  id: string;
+  text: string;
+  position: number;
 }
 
 export interface Expense {

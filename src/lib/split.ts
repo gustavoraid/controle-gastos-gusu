@@ -37,51 +37,23 @@ export function weightsToPercents(shares: Share[]): number[] {
   return splitByWeights(100, shares).map((l) => l.amountCents);
 }
 
-export type SplitMode = "project" | "equal" | "payer" | "other" | "exact";
-
 /**
- * Monta a divisão de uma despesa conforme o modo escolhido na tela.
- * - project: proporção padrão do projeto
- * - equal:   partes iguais entre todos os membros
- * - payer:   despesa pessoal de quem pagou (ninguém deve nada)
- * - other:   quem pagou adiantou tudo pelo(s) outro(s)
- * - exact:   valores digitados à mão (precisam somar o total)
+ * Divisão de uma despesa. A regra é sempre a proporção do projeto; ao editar uma
+ * despesa antiga, mantém a proporção com que ela foi lançada (se a do projeto
+ * mudou depois, editar o valor não reescreve o passado).
  */
-export function buildSplit(params: {
-  mode: SplitMode;
-  totalCents: number;
-  paidBy: string;
-  members: Share[];
-  exact?: Record<string, number>;
-}): SplitLine[] {
-  const { mode, totalCents, paidBy, members, exact } = params;
-  switch (mode) {
-    case "project":
-      return splitByWeights(totalCents, members);
-    case "equal":
-      return splitByWeights(
-        totalCents,
-        members.map((m) => ({ userId: m.userId, weight: 1 })),
-      );
-    case "payer":
-      return members.map((m) => ({
-        userId: m.userId,
-        amountCents: m.userId === paidBy ? totalCents : 0,
-      }));
-    case "other": {
-      const others = members.filter((m) => m.userId !== paidBy);
-      const parts = splitByWeights(
-        totalCents,
-        others.map((m) => ({ userId: m.userId, weight: 1 })),
-      );
-      return members.map((m) => ({
-        userId: m.userId,
-        amountCents: parts.find((p) => p.userId === m.userId)?.amountCents ?? 0,
-      }));
-    }
-    case "exact":
-      return members.map((m) => ({ userId: m.userId, amountCents: exact?.[m.userId] ?? 0 }));
-  }
+export function splitForExpense(
+  totalCents: number,
+  members: Share[],
+  previous?: SplitLine[],
+): SplitLine[] {
+  const prevTotal = previous?.reduce((acc, l) => acc + l.amountCents, 0) ?? 0;
+  if (!previous || prevTotal === 0) return splitByWeights(totalCents, members);
+  const weights = members.map((m) => ({
+    userId: m.userId,
+    weight: previous.find((l) => l.userId === m.userId)?.amountCents ?? 0,
+  }));
+  return splitByWeights(totalCents, weights);
 }
 
 export function splitTotal(lines: SplitLine[]): number {

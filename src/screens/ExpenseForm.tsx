@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Chip, ErrorBox, Header, Loading, haptic, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
@@ -6,7 +6,7 @@ import { back } from "@/hooks/useRoute";
 import { deleteExpense, getExpense, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
-import { buildSplit, splitByWeights, splitTotal, weightsToPercents, type SplitMode } from "@/lib/split";
+import { splitForExpense, weightsToPercents } from "@/lib/split";
 import type { Category, Expense, Member } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
@@ -38,15 +38,6 @@ export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; e
   );
 }
 
-/** Descobre em que modo uma despesa salva foi dividida, para reabrir igual. */
-function detectMode(e: Expense, members: Member[]): SplitMode {
-  const same = (mode: SplitMode) => {
-    const lines = buildSplit({ mode, totalCents: e.amountCents, paidBy: e.paidBy, members });
-    return lines.every((l) => l.amountCents === (e.splits.find((s) => s.userId === l.userId)?.amountCents ?? 0));
-  };
-  return (["project", "equal", "payer", "other"] as SplitMode[]).find(same) ?? "exact";
-}
-
 function Form(props: { projectId: string; me: string; members: Member[]; categories: Category[]; existing: Expense | null }) {
   const { projectId, me, members, categories, existing } = props;
   const isMember = members.some((m) => m.userId === me);
@@ -56,53 +47,42 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
   const [paidBy, setPaidBy] = useState(existing?.paidBy ?? (isMember ? me : members[0]?.userId));
   const [date, setDate] = useState(existing?.spentOn ?? todayISO());
-  const [mode, setMode] = useState<SplitMode>(existing ? detectMode(existing, members) : "project");
-  const [showSplit, setShowSplit] = useState(existing ? detectMode(existing, members) !== "project" : false);
-  const [exact, setExact] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      members.map((m) => [m.userId, existing ? centsToInput(existing.splits.find((s) => s.userId === m.userId)?.amountCents ?? 0) : ""]),
-    ),
-  );
   const [busy, setBusy] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
+  const descRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!existing) amountRef.current?.focus();
   }, [existing]);
 
   const cents = parseAmountToCents(amount);
-  const exactCents = useMemo(
-    () => Object.fromEntries(Object.entries(exact).map(([k, v]) => [k, parseAmountToCents(v) ?? 0])),
-    [exact],
-  );
-  const lines = cents ? buildSplit({ mode, totalCents: cents, paidBy, members, exact: exactCents }) : [];
-  const exactDiff = cents && mode === "exact" ? cents - splitTotal(lines) : 0;
-  const pct = weightsToPercents(members);
-  const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
+  const desc = description.trim();
+  const lines = cents ? splitForExpense(cents, members, existing?.splits) : [];
+  const category = categories.find((c) => c.id === categoryId);
+  const pct = existing ? null : weightsToPercents(members);
+  const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const today = todayISO();
   const yesterday = addDaysISO(today, -1);
 
-  const modes: { id: SplitMode; label: string }[] = [
-    { id: "project", label: `Proporção do projeto (${pct.join("/")})` },
-    { id: "equal", label: "Meio a meio" },
-    { id: "payer", label: `Só de ${paidBy === me ? "mim" : name(paidBy)}` },
-    { id: "other", label: `${paidBy === me ? "Paguei" : name(paidBy) + " pagou"} tudo pelo outro` },
-    { id: "exact", label: "Valores exatos" },
-  ];
-  // Com uma pessoa só, "pelo outro" não faz sentido.
-  const visibleModes = members.length > 1 ? modes : modes.filter((m) => m.id !== "other");
+  function pickCategory(id: string) {
+    // Descrição que veio de sugestão da categoria anterior não faz sentido na nova.
+    if (category?.suggestions.some((sg) => sg.text === desc)) setDescription("");
+    setCategoryId(categoryId === id ? null : id);
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!cents) return toast.err("Digite um valor válido.");
-    if (exactDiff !== 0) return toast.err(`A divisão está ${exactDiff > 0 ? "faltando" : "passando"} ${formatBRL(Math.abs(exactDiff))}.`);
-    const cat = categories.find((c) => c.id === categoryId);
+    if (!desc) {
+      descRef.current?.focus();
+      return toast.err("Escreva uma descrição.");
+    }
     setBusy(true);
     try {
       await saveExpense({
         id: existing?.id ?? null,
         projectId,
-        description: description.trim() || cat?.name || "Despesa",
+        description: desc,
         amountCents: cents,
         paidBy,
         categoryId,
@@ -157,16 +137,6 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
           />
         </label>
 
-        <input
-          className="desc-input"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={categories.find((c) => c.id === categoryId)?.name ?? "Descrição (opcional)"}
-          maxLength={120}
-          aria-label="Descrição"
-          enterKeyHint="done"
-        />
-
         <div className="field">
           <span>Categoria</span>
           <div className="cat-grid">
@@ -175,7 +145,7 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
                 type="button"
                 key={c.id}
                 className={`cat-pick ${categoryId === c.id ? "active" : ""}`}
-                onClick={() => setCategoryId(categoryId === c.id ? null : c.id)}
+                onClick={() => pickCategory(c.id)}
                 aria-pressed={categoryId === c.id}
               >
                 <span className="emoji-lg">{c.emoji}</span>
@@ -183,6 +153,30 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="field">
+          <span>Descrição</span>
+          <input
+            ref={descRef}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={category?.suggestions.length ? "Toque numa sugestão ou escreva" : "Ex.: Supermercado, Luz, Jantar"}
+            maxLength={120}
+            aria-label="Descrição"
+            aria-required="true"
+            enterKeyHint="done"
+            autoCapitalize="sentences"
+          />
+          {category && category.suggestions.length > 0 && (
+            <div className="chips">
+              {category.suggestions.map((sg) => (
+                <Chip key={sg.id} active={desc === sg.text} onClick={() => setDescription(sg.text)}>
+                  {sg.text}
+                </Chip>
+              ))}
+            </div>
+          )}
         </div>
 
         {members.length > 1 && (
@@ -211,62 +205,15 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
           </div>
         </div>
 
-        <div className="field">
-          <button type="button" className="split-summary" onClick={() => setShowSplit(!showSplit)} aria-expanded={showSplit}>
-            <span>
-              <span className="muted small">Divisão</span>
-              <strong>{visibleModes.find((m) => m.id === mode)?.label}</strong>
-            </span>
-            <span className="muted">{showSplit ? "▲" : "alterar ▼"}</span>
-          </button>
-
-          {showSplit && (
-            <div className="split-options">
-              <div className="chips">
-                {visibleModes.map((m) => (
-                  <Chip key={m.id} active={mode === m.id} onClick={() => {
-                    if (m.id === "exact" && cents && Object.values(exactCents).every((v) => v === 0)) {
-                      const base = splitByWeights(cents, members);
-                      setExact(Object.fromEntries(base.map((l) => [l.userId, centsToInput(l.amountCents)])));
-                    }
-                    setMode(m.id);
-                  }}>
-                    {m.label}
-                  </Chip>
-                ))}
-              </div>
-              {mode === "exact" && (
-                <div className="stack-sm">
-                  {members.map((m) => (
-                    <label key={m.userId} className="row between exact-row">
-                      <span>{m.userId === me ? "Eu" : m.name}</span>
-                      <input
-                        value={exact[m.userId] ?? ""}
-                        onChange={(e) => setExact({ ...exact, [m.userId]: e.target.value.replace(/[^\d.,]/g, "") })}
-                        inputMode="decimal"
-                        placeholder="0,00"
-                      />
-                    </label>
-                  ))}
-                  {exactDiff !== 0 && (
-                    <p className="text-err small">
-                      {exactDiff > 0 ? "Faltam" : "Sobram"} {formatBRL(Math.abs(exactDiff))}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {cents ? (
-            <p className="muted small split-preview">
-              {lines.map((l) => `${l.userId === me ? "Eu" : name(l.userId)} ${formatBRL(l.amountCents)}`).join(" · ")}
-            </p>
-          ) : null}
-        </div>
+        {members.length > 1 && (
+          <p className="muted small split-preview">
+            {pct ? `Divisão do projeto (${pct.join("/")})` : "Divisão original desta despesa"}
+            {cents ? `: ${lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" · ")}` : ""}
+          </p>
+        )}
 
         <div className="sticky-actions">
-          <button className="btn primary big" disabled={busy || !cents}>
+          <button className="btn primary big" disabled={busy || !cents || !desc}>
             {busy ? "Salvando…" : existing ? "Salvar alterações" : cents ? `Lançar ${formatBRL(cents)}` : "Lançar"}
           </button>
         </div>

@@ -6,7 +6,7 @@ import { createProject, joinProject } from "@/lib/api";
 const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚"];
 
 const TEMPLATES = [
-  { id: "casa", label: "Casa e dia a dia", hint: "Mercado, contas, restaurante, pets…" },
+  { id: "casa", label: "Casa e dia a dia", hint: "Mercado, contas, restaurante, pets… com descrições sugeridas (Luz, Feira, Aluguel…)" },
   { id: "viagem", label: "Viagem", hint: "Passagens, hospedagem, passeios…" },
   { id: "vazio", label: "Em branco", hint: "Só “Outros”; você cria as categorias" },
 ];
@@ -66,7 +66,7 @@ export function NewProject() {
             <span className="muted small">Dá para editar depois, em Ajustes do projeto.</span>
           </div>
 
-          <p className="muted small">A divisão começa 50/50. Você ajusta a proporção em Ajustes depois de convidar.</p>
+          <p className="muted small">A divisão começa 50/50 e vale para todas as despesas do projeto. Ajuste a proporção em Ajustes depois de convidar.</p>
 
           <button className="btn primary big" disabled={busy || !name.trim()}>
             {busy ? "Criando…" : "Criar projeto"}

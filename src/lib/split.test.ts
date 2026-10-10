@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSplit, splitByWeights, splitTotal, weightsToPercents } from "./split";
+import { splitByWeights, splitForExpense, splitTotal, weightsToPercents } from "./split";
 
 const casal = [
   { userId: "ana", weight: 60 },
@@ -59,24 +59,39 @@ describe("weightsToPercents", () => {
   });
 });
 
-describe("buildSplit", () => {
-  const base = { totalCents: 9000, paidBy: "ana", members: casal };
+describe("splitForExpense", () => {
+  it("despesa nova usa a proporção do projeto", () => {
+    expect(splitForExpense(9000, casal).map((l) => l.amountCents)).toEqual([5400, 3600]);
+  });
 
-  it("project usa a proporção do projeto", () => {
-    expect(buildSplit({ ...base, mode: "project" }).map((l) => l.amountCents)).toEqual([5400, 3600]);
+  it("ao editar, mantém a proporção original mesmo que a do projeto tenha mudado", () => {
+    const original = [
+      { userId: "ana", amountCents: 5000 },
+      { userId: "beto", amountCents: 5000 },
+    ];
+    // Projeto agora é 60/40, mas a despesa foi lançada 50/50: novo valor segue 50/50.
+    expect(splitForExpense(3001, casal, original)).toEqual([
+      { userId: "ana", amountCents: 1501 },
+      { userId: "beto", amountCents: 1500 },
+    ]);
   });
-  it("equal ignora a proporção", () => {
-    expect(buildSplit({ ...base, mode: "equal" }).map((l) => l.amountCents)).toEqual([4500, 4500]);
+
+  it("membro sem parte na despesa original continua sem parte", () => {
+    const original = [{ userId: "ana", amountCents: 1000 }];
+    expect(splitForExpense(2000, casal, original).map((l) => l.amountCents)).toEqual([2000, 0]);
   });
-  it("payer: despesa pessoal de quem pagou", () => {
-    expect(buildSplit({ ...base, mode: "payer" }).map((l) => l.amountCents)).toEqual([9000, 0]);
+
+  it("divisão anterior vazia volta para a proporção do projeto", () => {
+    expect(splitForExpense(1000, casal, []).map((l) => l.amountCents)).toEqual([600, 400]);
   });
-  it("other: quem pagou adiantou tudo para o outro", () => {
-    expect(buildSplit({ ...base, mode: "other" }).map((l) => l.amountCents)).toEqual([0, 9000]);
-  });
-  it("exact usa os valores digitados", () => {
-    const lines = buildSplit({ ...base, mode: "exact", exact: { ana: 1000, beto: 8000 } });
-    expect(lines.map((l) => l.amountCents)).toEqual([1000, 8000]);
-    expect(splitTotal(lines)).toBe(9000);
+
+  it("nunca perde centavo", () => {
+    const original = [
+      { userId: "ana", amountCents: 333 },
+      { userId: "beto", amountCents: 667 },
+    ];
+    for (const total of [1, 7, 99, 12345]) {
+      expect(splitTotal(splitForExpense(total, casal, original))).toBe(total);
+    }
   });
 });
