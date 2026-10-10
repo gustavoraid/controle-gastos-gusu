@@ -1,0 +1,47 @@
+const TZ = "America/Sao_Paulo";
+
+/** "Hoje" no fuso de Brasília, em YYYY-MM-DD. Nunca use toISOString() (é UTC). */
+export function todayISO(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(now);
+}
+
+export function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "2026-10" → { start: "2026-10-01", end: "2026-10-31" } */
+export function monthRange(ym: string): { start: string; end: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { start: `${ym}-01`, end: `${ym}-${String(last).padStart(2, "0")}` };
+}
+
+export function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+const monthFmt = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+
+/** "2026-10" → "Outubro de 2026" */
+export function monthLabel(ym: string): string {
+  const s = monthFmt.format(new Date(`${ym}-01T12:00:00Z`));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const dayFmt = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+  timeZone: "UTC",
+});
+
+/** Rótulo de cabeçalho de dia na lista: "Hoje", "Ontem" ou "sex., 03 de out." */
+export function dayLabel(iso: string, today: string = todayISO()): string {
+  if (iso === today) return "Hoje";
+  if (iso === addDaysISO(today, -1)) return "Ontem";
+  return dayFmt.format(new Date(`${iso}T12:00:00Z`));
+}
