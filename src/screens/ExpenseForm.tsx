@@ -83,6 +83,7 @@ function Form(props: {
   const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
   const today = todayISO();
   const yesterday = addDaysISO(today, -1);
+  const dayBefore = addDaysISO(today, -2);
 
   function pickCategory(id: string) {
     // Descrição que veio de sugestão da categoria anterior não faz sentido na nova.
@@ -241,7 +242,10 @@ function Form(props: {
             <Chip active={date === yesterday} onClick={() => setDate(yesterday)}>
               Ontem
             </Chip>
-            <input type="date" className={`chip date-chip ${date !== today && date !== yesterday ? "active" : ""}`} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
+            <Chip active={date === dayBefore} onClick={() => setDate(dayBefore)}>
+              Anteontem
+            </Chip>
+            <input type="date" className={`chip date-chip ${![today, yesterday, dayBefore].includes(date) ? "active" : ""}`} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
           </div>
         </div>
 

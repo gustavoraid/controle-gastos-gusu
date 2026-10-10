@@ -1,8 +1,10 @@
-const TZ = "America/Sao_Paulo";
-
-/** "Hoje" no fuso de Brasília, em YYYY-MM-DD. Nunca use toISOString() (é UTC). */
-export function todayISO(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(now);
+/**
+ * "Hoje" no fuso do aparelho, em YYYY-MM-DD — numa viagem ao Peru é o dia de
+ * Lima, não o de Brasília. Nunca use toISOString() (é UTC). `timeZone` existe
+ * só para teste.
+ */
+export function todayISO(now: Date = new Date(), timeZone?: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(now);
 }
 
 export function addDaysISO(iso: string, days: number): string {
