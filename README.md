@@ -2,7 +2,7 @@
 
 App de celular (PWA) para controlar e dividir gastos a dois, no estilo Splitwise.
 
-- **Projetos** separados (Casa, Viagem…), cada um com a **proporção de divisão** própria em pesos
+- **Projetos** separados, com **tipo** (Casa, Viagem ou Outros — por enquanto só classifica), cada um com a **proporção de divisão** própria em pesos
   livres (1 e 2, 60 e 40…),
   aplicada a todas as despesas do projeto — mudar a proporção recalcula todas, inclusive as antigas.
 - **Categorias por projeto** com **descrições sugeridas** (Luz, Água, Feira, Aluguel…). Projeto novo
@@ -81,7 +81,7 @@ dois. Ajuste a proporção em **Ajustes do projeto**.
 
 ```
 profiles ─┐
-          ├─ project_members (peso na divisão) ── projects (nome, emoji)
+          ├─ project_members (peso na divisão) ── projects (nome, emoji, tipo)
           │                                           │
           │                                           ├─ categories ── category_suggestions
           │                                           │

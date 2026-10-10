@@ -16,7 +16,7 @@ import {
 import { computeNets, suggestTransfers } from "@/lib/balances";
 import { formatBRL } from "@/lib/money";
 import { parseWeight, percentLabels } from "@/lib/split";
-import type { Category, Member, Project } from "@/lib/types";
+import { PROJECT_TYPES, type Category, type Member, type Project, type ProjectType } from "@/lib/types";
 
 export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
   const proj = useProject(projectId);
@@ -37,7 +37,7 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
     <>
       <Header title="Ajustes do projeto" onBack={() => back(`/p/${projectId}`)} />
       <main className="page stack">
-        <ProjectInfo key={project.id + project.name + project.emoji} project={project} />
+        <ProjectInfo key={project.id + project.name + project.emoji + project.type} project={project} />
         <Proportions key={members.map((m) => m.userId + m.weight).join()} projectId={projectId} members={members} me={me} />
         <Categories projectId={projectId} categories={categories} onChange={proj.reload} />
 
@@ -52,11 +52,12 @@ const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "�
 function ProjectInfo({ project }: { project: Project }) {
   const [name, setName] = useState(project.name);
   const [emoji, setEmoji] = useState(project.emoji);
-  const dirty = name.trim() !== project.name || emoji !== project.emoji;
+  const [type, setType] = useState<ProjectType>(project.type);
+  const dirty = name.trim() !== project.name || emoji !== project.emoji || type !== project.type;
 
   async function save() {
     try {
-      await updateProject(project.id, { name: name.trim(), emoji });
+      await updateProject(project.id, { name: name.trim(), emoji, type });
       toast.ok("Projeto atualizado");
     } catch (err) {
       toast.err((err as Error).message);
@@ -73,6 +74,13 @@ function ProjectInfo({ project }: { project: Project }) {
           ))}
         </select>
         <input className="grow" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome do projeto" />
+      </div>
+      <div className="segmented" aria-label="Tipo do projeto">
+        {PROJECT_TYPES.map((t) => (
+          <button type="button" key={t.id} className={type === t.id ? "active" : ""} onClick={() => setType(t.id)}>
+            {t.label}
+          </button>
+        ))}
       </div>
       {dirty && (
         <button className="btn primary" onClick={save} disabled={!name.trim()}>

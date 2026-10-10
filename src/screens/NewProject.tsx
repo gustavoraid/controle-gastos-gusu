@@ -3,6 +3,7 @@ import { Chip, Header, toast } from "@/components/ui";
 import { back, go } from "@/hooks/useRoute";
 import { useLoad } from "@/hooks/useLoad";
 import { createProject, listProjects } from "@/lib/api";
+import { PROJECT_TYPES, type ProjectType } from "@/lib/types";
 
 const EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚"];
 
@@ -10,6 +11,7 @@ export function NewProject({ me }: { me: string }) {
   const projects = useLoad(() => listProjects(me), [me]);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🏠");
+  const [type, setType] = useState<ProjectType>("casa");
   const [copyFrom, setCopyFrom] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +21,7 @@ export function NewProject({ me }: { me: string }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const id = await createProject(name.trim(), emoji, copyFrom || null);
+      const id = await createProject(name.trim(), emoji, type, copyFrom || null);
       go(`/p/${id}`, { replace: true });
     } catch (err) {
       toast.err((err as Error).message);
@@ -38,6 +40,17 @@ export function NewProject({ me }: { me: string }) {
           </label>
 
           <div className="field">
+            <span>Tipo</span>
+            <div className="segmented">
+              {PROJECT_TYPES.map((t) => (
+                <button type="button" key={t.id} className={type === t.id ? "active" : ""} onClick={() => setType(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
             <span>Ícone</span>
             <div className="chips">
               {EMOJIS.map((e) => (
@@ -51,7 +64,14 @@ export function NewProject({ me }: { me: string }) {
           {projects.data && projects.data.length > 0 && (
             <label className="field">
               <span>Começar a partir de</span>
-              <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}>
+              <select
+                value={copyFrom}
+                onChange={(e) => {
+                  setCopyFrom(e.target.value);
+                  const src = projects.data?.find((p) => p.id === e.target.value);
+                  if (src) setType(src.type);
+                }}
+              >
                 <option value="">Base padrão (categorias de casa com sugestões)</option>
                 {projects.data.map((p) => (
                   <option key={p.id} value={p.id}>

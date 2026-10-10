@@ -19,6 +19,8 @@ create table public.projects (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(trim(name)) between 1 and 60),
   emoji text not null default '💰',
+  -- Tipo do projeto. Por enquanto só classifica; no futuro define a visão de análise.
+  type text not null default 'casa' check (type in ('casa', 'viagem', 'outros')),
   created_by uuid not null default auth.uid() references public.profiles (id),
   archived boolean not null default false,
   created_at timestamptz not null default now()
@@ -216,8 +218,14 @@ after insert on auth.users
 for each row execute function public.handle_new_user ();
 
 -- Cria o projeto já com as duas pessoas. Com p_copy_from, copia proporção,
--- categorias e sugestões de outro projeto; sem, usa a base padrão de casa.
-create or replace function public.create_project (p_name text, p_emoji text, p_copy_from uuid default null)
+-- categorias e sugestões de outro projeto; sem, usa a base padrão de casa
+-- (o tipo não muda a base: só classifica o projeto).
+create or replace function public.create_project (
+  p_name text,
+  p_emoji text,
+  p_type text,
+  p_copy_from uuid default null
+)
 returns uuid
 language plpgsql
 security definer
@@ -240,8 +248,8 @@ begin
     raise exception 'sem acesso ao projeto de origem';
   end if;
 
-  insert into projects (name, emoji, created_by)
-  values (trim(p_name), coalesce(nullif(p_emoji, ''), '💰'), v_uid)
+  insert into projects (name, emoji, type, created_by)
+  values (trim(p_name), coalesce(nullif(p_emoji, ''), '💰'), p_type, v_uid)
   returning id into v_id;
 
   insert into project_members (project_id, user_id, weight)
@@ -331,7 +339,7 @@ create policy expenses_all on public.expenses for all
 create policy settlements_all on public.settlements for all
   using (is_project_member(project_id)) with check (is_project_member(project_id));
 
-grant execute on function public.create_project (text, text, uuid) to authenticated;
+grant execute on function public.create_project (text, text, text, uuid) to authenticated;
 grant select on public.expense_shares to authenticated;
 grant select on public.project_balances to authenticated;
 

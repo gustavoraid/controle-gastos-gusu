@@ -5,6 +5,7 @@ import type {
   Member,
   Project,
   ProjectSummary,
+  ProjectType,
   Settlement,
   Suggestion,
 } from "@/lib/types";
@@ -40,6 +41,7 @@ const mapProject = (r: any): Project => ({
   id: r.id,
   name: r.name,
   emoji: r.emoji,
+  type: r.type,
   createdBy: r.created_by,
   archived: r.archived,
 });
@@ -141,14 +143,22 @@ export async function getBalances(projectId: string): Promise<Record<string, num
   return Object.fromEntries(rows.map((r) => [r.user_id, Number(r.net_cents)]));
 }
 
-/** copyFrom: projeto cujas pessoas, proporção, categorias e sugestões serão copiadas. */
-export async function createProject(name: string, emoji: string, copyFrom: string | null) {
+/** copyFrom: projeto cuja proporção, categorias e sugestões serão copiadas. */
+export async function createProject(name: string, emoji: string, type: ProjectType, copyFrom: string | null) {
   return check<string>(
-    await supabase.rpc("create_project", { p_name: name, p_emoji: emoji, p_copy_from: copyFrom }),
+    await supabase.rpc("create_project", {
+      p_name: name,
+      p_emoji: emoji,
+      p_type: type,
+      p_copy_from: copyFrom,
+    }),
   );
 }
 
-export async function updateProject(id: string, patch: { name?: string; emoji?: string; archived?: boolean }) {
+export async function updateProject(
+  id: string,
+  patch: { name?: string; emoji?: string; type?: ProjectType; archived?: boolean },
+) {
   check(await supabase.from("projects").update(patch).eq("id", id));
 }
 

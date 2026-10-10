@@ -4,10 +4,19 @@ export interface Member {
   weight: number;
 }
 
+export type ProjectType = "casa" | "viagem" | "outros";
+
+export const PROJECT_TYPES: { id: ProjectType; label: string }[] = [
+  { id: "casa", label: "Casa" },
+  { id: "viagem", label: "Viagem" },
+  { id: "outros", label: "Outros" },
+];
+
 export interface Project {
   id: string;
   name: string;
   emoji: string;
+  type: ProjectType;
   createdBy: string;
   archived: boolean;
 }
