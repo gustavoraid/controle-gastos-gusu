@@ -489,12 +489,16 @@ select:focus {
 }
 
 .avatar {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   color: #fff;
   font-weight: 700;
   flex: none;
+  /* line-height herdado (1.4) empurrava a letra para baixo nas bolinhas pequenas */
+  line-height: 1;
+  text-align: center;
 }
 
 .day-label {

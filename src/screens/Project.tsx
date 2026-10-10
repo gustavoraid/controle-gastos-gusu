@@ -65,7 +65,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
     <>
       <Header title={`${project.emoji} ${project.name}`} onBack={() => back("/")} action={settingsBtn} />
       <main className="page with-fab">
-        <BalanceBanner me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
 
         {!isTrip && (
         <nav className="month-nav">
@@ -108,7 +107,17 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           />
         )}
         {activity.data && tab === "resumo" && (
-          <MonthSummary members={members} cats={cats} expenses={activity.data.expenses} isTrip={isTrip} />
+          <>
+            {/* saldo é de todo o projeto (não só do mês): por isso "Saldo geral" */}
+            <BalanceBanner
+              me={me}
+              members={members}
+              balances={balances}
+              label={isTrip ? "Saldo da viagem" : "Saldo geral"}
+              onSettle={() => go(`/p/${id}/acertar`)}
+            />
+            <MonthSummary members={members} cats={cats} expenses={activity.data.expenses} isTrip={isTrip} />
+          </>
         )}
       </main>
 
@@ -119,7 +128,13 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   );
 }
 
-function BalanceBanner(props: { me: string; members: Member[]; balances: Record<string, number>; onSettle: () => void }) {
+function BalanceBanner(props: {
+  me: string;
+  members: Member[];
+  balances: Record<string, number>;
+  label: string;
+  onSettle: () => void;
+}) {
   const { me, members, balances } = props;
   const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
   const mine = suggestTransfers(balances).filter((t) => t.from === me || t.to === me);
@@ -127,6 +142,7 @@ function BalanceBanner(props: { me: string; members: Member[]; balances: Record<
 
   return (
     <section className="balance-banner">
+      <span className="muted small">{props.label}</span>
       {mine.length === 0 ? (
         <p className="balance-title">Tudo certo entre vocês ✨</p>
       ) : (
