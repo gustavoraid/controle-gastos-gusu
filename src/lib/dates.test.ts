@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import { addDaysISO, dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "./dates";
 
 describe("datas", () => {
-  it("hoje usa o fuso de Brasília, não UTC", () => {
-    // 22h em São Paulo já é dia seguinte em UTC.
+  it("hoje usa o fuso do aparelho, não UTC", () => {
+    // 22h em São Paulo (fuso fixado nos testes) já é dia seguinte em UTC.
     expect(todayISO(new Date("2026-10-11T01:30:00Z"))).toBe("2026-10-10");
+  });
+  it("viajando, hoje é o dia do lugar onde o celular está", () => {
+    // 04h10 UTC: já é dia 10 em Brasília, ainda é dia 9 às 23h10 em Lima.
+    const agora = new Date("2026-10-10T04:10:00Z");
+    expect(todayISO(agora, "America/Sao_Paulo")).toBe("2026-10-10");
+    expect(todayISO(agora, "America/Lima")).toBe("2026-10-09");
   });
   it("soma dias atravessando mês", () => {
     expect(addDaysISO("2026-10-31", 1)).toBe("2026-11-01");

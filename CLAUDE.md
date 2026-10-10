@@ -19,6 +19,7 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
   original (`amount` + `currency`); o valor em reais é calculado na leitura pela cotação do projeto
   (`project_currencies.rate`, retroativa). `expense_values` (SQL) e `toBrlCents()` (TS) têm que dar o
   mesmo centavo. Nunca some floats de reais.
-- "Hoje" sempre por `todayISO()` (fuso de Brasília), nunca `toISOString()`.
+- "Hoje" sempre por `todayISO()` (fuso do aparelho — o casal viaja; um fuso fixo erra o dia no
+  exterior), nunca `toISOString()` (UTC). Os testes fixam `TZ=America/Sao_Paulo`.
 - Rotas por hash (`#/p/:id`) para funcionar em hospedagem estática sem rewrite.
 - Consultas que podem passar de 1000 linhas usam `fetchAll` (teto do PostgREST).
