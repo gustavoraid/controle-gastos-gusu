@@ -9,14 +9,36 @@ import {
   deleteProject,
   deleteSuggestion,
   listAllForBalance,
+  ratesOf,
+  removeCurrency,
+  setRate,
+  addCurrency,
+  type Rates,
   setWeights,
   updateCategory,
   updateProject,
 } from "@/lib/api";
-import { computeNets, suggestTransfers } from "@/lib/balances";
+import { computeNets, inBrl, suggestTransfers } from "@/lib/balances";
+import {
+  CURRENCIES,
+  MAX_EXTRA_CURRENCIES,
+  currencyDecimals,
+  currencyName,
+  formatMoney,
+  parseRate,
+  rateToInput,
+  toBrlCents,
+} from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { parseWeight, percentLabels } from "@/lib/split";
-import { PROJECT_TYPES, type Category, type Member, type Project, type ProjectType } from "@/lib/types";
+import {
+  PROJECT_TYPES,
+  type Category,
+  type Member,
+  type Project,
+  type ProjectCurrency,
+  type ProjectType,
+} from "@/lib/types";
 
 export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
   const proj = useProject(projectId);
@@ -31,14 +53,27 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
     );
   }
   if (!proj.data) return <Loading />;
-  const { project, members, categories } = proj.data;
+  const { project, members, categories, currencies } = proj.data;
 
   return (
     <>
       <Header title="Ajustes do projeto" onBack={() => back(`/p/${projectId}`)} />
       <main className="page stack">
         <ProjectInfo key={project.id + project.name + project.emoji + project.type} project={project} />
-        <Proportions key={members.map((m) => m.userId + m.weight).join()} projectId={projectId} members={members} me={me} />
+        <Proportions
+          key={members.map((m) => m.userId + m.weight).join()}
+          projectId={projectId}
+          members={members}
+          rates={ratesOf(currencies)}
+          me={me}
+        />
+        <Currencies
+          key={currencies.map((c) => c.code + c.rate).join() + project.defaultCurrency}
+          project={project}
+          members={members}
+          currencies={currencies}
+          onChange={proj.reload}
+        />
         <Categories projectId={projectId} categories={categories} onChange={proj.reload} />
 
         <DangerZone project={project} />
@@ -100,7 +135,38 @@ const PRESETS: [number, number][] = [
   [1, 2],
 ];
 
-function Proportions({ projectId, members, me }: { projectId: string; members: Member[]; me: string }) {
+/**
+ * Mudar proporção ou cotação recalcula todas as despesas, inclusive as já acertadas:
+ * mostra o saldo antes/depois e pede confirmação. Devolve true se confirmado.
+ */
+async function confirmRecalc(params: {
+  projectId: string;
+  members: Member[];
+  rates: Rates;
+  nextMembers?: Member[];
+  nextRates?: Rates;
+  what: string;
+}): Promise<boolean> {
+  const { projectId, members, rates } = params;
+  const all = await listAllForBalance(projectId);
+  if (all.expenses.length === 0) return confirm(`Salvar ${params.what}?`);
+  const describe = (nets: Record<string, number>) => {
+    const t = suggestTransfers(nets);
+    if (t.length === 0) return "quitado";
+    const nm = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
+    return t.map((x) => `${nm(x.from)} deve ${formatBRL(x.amountCents)} a ${nm(x.to)}`).join("; ");
+  };
+  const before = describe(computeNets(inBrl(all.expenses, rates), all.settlements, members));
+  const after = describe(
+    computeNets(inBrl(all.expenses, params.nextRates ?? rates), all.settlements, params.nextMembers ?? members),
+  );
+  return confirm(
+    `Isso recalcula as despesas já lançadas neste projeto.\n\n` +
+      `Saldo hoje: ${before}\nSaldo depois: ${after}\n\nSalvar ${params.what}?`,
+  );
+}
+
+function Proportions({ projectId, members, rates, me }: { projectId: string; members: Member[]; rates: Rates; me: string }) {
   const fmt = (w: number) => String(w).replace(".", ",");
   const [inputs, setInputs] = useState(() => members.map((m) => fmt(m.weight)));
   const parsed = inputs.map(parseWeight);
@@ -111,29 +177,13 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
 
   async function save() {
     try {
-      // Mudar a proporção recalcula todas as despesas, inclusive as já acertadas:
-      // mostra o saldo antes/depois para ninguém ser pego de surpresa.
-      const all = await listAllForBalance(projectId);
-      const before = describe(computeNets(all.expenses, all.settlements, members));
-      const after = describe(computeNets(all.expenses, all.settlements, next));
-      const msg =
-        all.expenses.length === 0
-          ? "Salvar a nova proporção?"
-          : `Isso recalcula as ${all.expenses.length} despesas já lançadas neste projeto.\n\n` +
-            `Saldo hoje: ${before}\nSaldo depois: ${after}\n\nSalvar?`;
-      if (!confirm(msg)) return;
+      const nextMembers = members.map((m, i) => ({ ...m, weight: next[i].weight }));
+      if (!(await confirmRecalc({ projectId, members, rates, nextMembers, what: "a nova proporção" }))) return;
       await setWeights(projectId, Object.fromEntries(next.map((n) => [n.userId, n.weight])));
       toast.ok("Proporção salva");
     } catch (err) {
       toast.err((err as Error).message);
     }
-  }
-
-  function describe(nets: Record<string, number>) {
-    const t = suggestTransfers(nets);
-    if (t.length === 0) return "quitado";
-    const nm = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
-    return t.map((x) => `${nm(x.from)} deve ${formatBRL(x.amountCents)} a ${nm(x.to)}`).join("; ");
   }
 
   return (
@@ -174,6 +224,170 @@ function Proportions({ projectId, members, me }: { projectId: string; members: M
         <button className="btn primary" onClick={save} disabled={!valid}>
           Salvar proporção
         </button>
+      )}
+    </section>
+  );
+}
+
+/** Exemplo para conferir a cotação: 100 unidades, ou 10.000 para moedas "pequenas". */
+function sampleAmount(code: string, rate: number): number {
+  const units = rate < 0.1 ? 10_000 : 100;
+  return units * 10 ** currencyDecimals(code);
+}
+
+function Currencies(props: {
+  project: Project;
+  members: Member[];
+  currencies: ProjectCurrency[];
+  onChange: () => void;
+}) {
+  const { project, members, currencies } = props;
+  const extras = currencies.filter((c) => c.code !== "BRL");
+  const available = CURRENCIES.filter((c) => !currencies.some((pc) => pc.code === c.code));
+  const [newCode, setNewCode] = useState(available[0]?.code ?? "");
+  const [newRate, setNewRate] = useState("");
+  const [rates, setRates] = useState(() => Object.fromEntries(extras.map((c) => [c.code, rateToInput(c.rate)])));
+
+  async function run(fn: () => Promise<void>, ok: string) {
+    try {
+      await fn();
+      toast.ok(ok);
+      props.onChange();
+    } catch (err) {
+      toast.err((err as Error).message);
+    }
+  }
+
+  async function saveRate(code: string) {
+    const rate = parseRate(rates[code] ?? "");
+    if (!rate) return toast.err("Cotação inválida.");
+    const current = ratesOf(currencies);
+    try {
+      const ok = await confirmRecalc({
+        projectId: project.id,
+        members,
+        rates: current,
+        nextRates: { ...current, [code]: rate },
+        what: `a cotação do ${code}`,
+      });
+      if (ok) await run(() => setRate(project.id, code, rate), "Cotação salva");
+    } catch (err) {
+      toast.err((err as Error).message);
+    }
+  }
+
+  const parsedNew = parseRate(newRate);
+
+  return (
+    <section className="card stack-sm">
+      <h2 className="card-title">Moedas</h2>
+      <p className="muted small">
+        Despesas podem ser lançadas em até {MAX_EXTRA_CURRENCIES} moedas além do real. O saldo e o acerto são sempre em
+        reais, pela cotação daqui — mudar a cotação recalcula as despesas já lançadas.
+      </p>
+
+      <ul className="currency-list">
+        <li className="row between">
+          <span>
+            <strong>R$</strong> Real
+          </span>
+          <span className="muted small">sempre disponível</span>
+        </li>
+        {extras.map((c) => {
+          const typed = parseRate(rates[c.code] ?? "");
+          const dirty = typed !== null && typed !== c.rate;
+          const sample = sampleAmount(c.code, typed ?? c.rate);
+          return (
+            <li key={c.code} className="stack-sm">
+              <div className="row between">
+                <span>
+                  <strong>{c.code}</strong> {currencyName(c.code)}
+                </span>
+                <button
+                  className="btn small ghost"
+                  onClick={() =>
+                    confirm(`Remover ${c.code} do projeto?`) &&
+                    run(() => removeCurrency(project.id, c.code, project.defaultCurrency === c.code), "Moeda removida")
+                  }
+                >
+                  Remover
+                </button>
+              </div>
+              <label className="row gap-sm">
+                <span className="muted small">1 {c.code} = R$</span>
+                <input
+                  className="grow"
+                  inputMode="decimal"
+                  value={rates[c.code] ?? ""}
+                  onChange={(e) => setRates({ ...rates, [c.code]: e.target.value.replace(/[^\d.,]/g, "") })}
+                  aria-label={`Cotação do ${c.code}`}
+                />
+                {dirty && (
+                  <button className="btn small primary" onClick={() => saveRate(c.code)}>
+                    Salvar
+                  </button>
+                )}
+              </label>
+              <span className="muted small">
+                {typed
+                  ? `Conferência: ${formatMoney(sample, c.code)} = ${formatBRL(toBrlCents(sample, c.code, typed))}`
+                  : "Cotação inválida"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {currencies.length > 1 && (
+        <div className="field">
+          <span>Moeda que vem selecionada ao lançar</span>
+          <div className="segmented">
+            {currencies.map((c) => (
+              <button
+                type="button"
+                key={c.code}
+                className={project.defaultCurrency === c.code ? "active" : ""}
+                onClick={() =>
+                  project.defaultCurrency !== c.code &&
+                  run(() => updateProject(project.id, { default_currency: c.code }), "Moeda padrão alterada")
+                }
+              >
+                {c.code === "BRL" ? "R$" : c.code}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {extras.length < MAX_EXTRA_CURRENCIES && available.length > 0 && (
+        <form
+          className="stack-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!parsedNew || !newCode) return;
+            run(() => addCurrency(project.id, newCode, parsedNew), `${newCode} adicionada`);
+          }}
+        >
+          <div className="row gap-sm">
+            <select className="currency-select" value={newCode} onChange={(e) => setNewCode(e.target.value)} aria-label="Nova moeda">
+              {available.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} · {c.name}
+                </option>
+              ))}
+            </select>
+            <input className="grow" inputMode="decimal" value={newRate} onChange={(e) => setNewRate(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Cotação em R$" aria-label="Cotação da nova moeda" />
+          </div>
+          {parsedNew && newCode && (
+            <span className="muted small">
+              1 {newCode} = R$ {newRate} · {formatMoney(sampleAmount(newCode, parsedNew), newCode)} ={" "}
+              {formatBRL(toBrlCents(sampleAmount(newCode, parsedNew), newCode, parsedNew))}
+            </span>
+          )}
+          <button className="btn primary small" disabled={!parsedNew || !newCode}>
+            Adicionar moeda
+          </button>
+        </form>
       )}
     </section>
   );

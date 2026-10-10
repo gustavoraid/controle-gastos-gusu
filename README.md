@@ -11,6 +11,9 @@ App de celular (PWA) para controlar e dividir gastos a dois, no estilo Splitwise
 - **Lançamento rápido**: valor → categoria → toque numa sugestão → salvar. "Quem pagou" já vem como
   você e a data como hoje. Categoria e descrição são obrigatórias.
 - **Saldo** ("Fulana te deve R$ X") e **acerto de contas** (registro do Pix).
+- **Moedas estrangeiras** por projeto (até 2 além do real, com cotação). Despesa é lançada na moeda
+  original; saldo e acerto são em reais, pela cotação do projeto — corrigir a cotação (ex.: quando
+  chega a fatura) recalcula tudo.
 - **Resumo do mês**: total, quanto cada um pagou e assumiu, gasto por categoria.
 - **Tempo real**: o que um lança aparece no celular do outro.
 - **Instalável** com ícone na tela inicial e atalho "Nova despesa" (pressionar o ícone no Android).
@@ -85,13 +88,15 @@ dois. Ajuste a proporção em **Ajustes do projeto**.
 
 ```
 profiles ─┐
-          ├─ project_members (peso na divisão) ── projects (nome, emoji, tipo)
+          ├─ project_members (peso na divisão) ── projects (nome, emoji, tipo, moeda padrão)
+          │                                           ├─ project_currencies (BRL + até 2, com cotação)
           │                                           │
           │                                           ├─ categories ── category_suggestions
           │                                           │
-          ├─ expenses (valor, quem pagou, categoria, data, descrição)
+          ├─ expenses (valor na moeda original, moeda, quem pagou, categoria, data, descrição)
           └─ settlements (acertos: quem pagou a quem)
 
+expense_values (view)   = valor de cada despesa em reais, pela cotação atual
 expense_shares (view)   = parte de cada pessoa em cada despesa, pela proporção atual
 project_balances (view) = saldo de cada pessoa por projeto
 ```
@@ -99,5 +104,4 @@ project_balances (view) = saldo de cada pessoa por projeto
 ## Limitações conhecidas
 
 - Sem lançamento offline: o app abre sem internet, mas salvar precisa de conexão.
-- Uma moeda só (R$).
 - Ícones: `npm run icons` regenera os PNGs a partir do desenho em `scripts/gen-icons.py` (precisa de Pillow).

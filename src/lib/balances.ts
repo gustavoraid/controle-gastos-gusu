@@ -1,3 +1,4 @@
+import { toBrlCents } from "@/lib/currency";
 import { expenseShares, type Share } from "@/lib/split";
 
 export interface Transfer {
@@ -46,6 +47,14 @@ export function expenseImpact(
   const myShare = splits.find((s) => s.userId === me)?.amountCents ?? 0;
   const paid = expense.paidBy === me ? expense.amountCents : 0;
   return paid - myShare;
+}
+
+/** Despesas na moeda original → em centavos de real pelas cotações dadas. */
+export function inBrl(
+  expenses: { paidBy: string; amount: number; currency: string }[],
+  rates: Record<string, number>,
+): { paidBy: string; amountCents: number }[] {
+  return expenses.map((e) => ({ paidBy: e.paidBy, amountCents: toBrlCents(e.amount, e.currency, rates[e.currency] ?? 0) }));
 }
 
 /**

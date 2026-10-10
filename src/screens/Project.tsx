@@ -6,6 +6,7 @@ import { back, go } from "@/hooks/useRoute";
 import { deleteSettlement, listMonth } from "@/lib/api";
 import { expenseImpact, suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
 import { setLastProject } from "@/lib/storage";
@@ -231,7 +232,10 @@ function ExpenseRow(props: { e: Expense; me: string; members: Member[]; names: M
         <span className="grow min0">
           <strong className="ellipsis">{e.description}</strong>
           <span className="muted small">
-            {payer} pagou {formatBRL(e.amountCents)}
+            {payer} pagou{" "}
+            {e.currency === "BRL"
+              ? formatBRL(e.amountCents)
+              : `${formatMoney(e.amount, e.currency)} (≈ ${formatBRL(e.amountCents)})`}
           </span>
         </span>
         <span className="impact">
@@ -264,6 +268,10 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
     );
   }
 
+  const foreign = new Map<string, number>();
+  for (const e of expenses) if (e.currency !== "BRL") foreign.set(e.currency, (foreign.get(e.currency) ?? 0) + e.amount);
+  const foreignTotals = [...foreign.entries()];
+
   const byCat = new Map<string, number>();
   for (const e of expenses) {
     const k = e.categoryId ?? "";
@@ -287,6 +295,11 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
         <span className="muted">Total gasto no mês</span>
         <span className="money big">{formatBRL(total)}</span>
         <span className="muted small">{expenses.length} despesa{expenses.length > 1 ? "s" : ""}</span>
+        {foreignTotals.length > 0 && (
+          <span className="muted small">
+            Inclui {foreignTotals.map(([code, amt]) => formatMoney(amt, code)).join(" e ")} convertidos pela cotação do projeto
+          </span>
+        )}
       </section>
 
       <section className="card">

@@ -5,9 +5,10 @@ import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
 import { deleteExpense, getExpense, newId, saveExpense } from "@/lib/api";
 import { addDaysISO, todayISO } from "@/lib/dates";
-import { centsToInput, formatBRL, parseAmountToCents } from "@/lib/money";
+import { currencyDecimals, formatMoney, minorToInput, parseAmountMinor, toBrlCents } from "@/lib/currency";
+import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
-import type { Category, Expense, Member } from "@/lib/types";
+import type { Category, Expense, Member, ProjectCurrency } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
   const proj = useProject(projectId);
@@ -32,17 +33,30 @@ export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; e
       projectId={projectId}
       me={me}
       members={proj.data.members}
+      currencies={proj.data.currencies}
+      defaultCurrency={proj.data.project.defaultCurrency}
       categories={proj.data.categories.filter((c) => !c.archived || c.id === existing.data?.categoryId)}
       existing={existing.data}
     />
   );
 }
 
-function Form(props: { projectId: string; me: string; members: Member[]; categories: Category[]; existing: Expense | null }) {
-  const { projectId, me, members, categories, existing } = props;
+function Form(props: {
+  projectId: string;
+  me: string;
+  members: Member[];
+  currencies: ProjectCurrency[];
+  defaultCurrency: string;
+  categories: Category[];
+  existing: Expense | null;
+}) {
+  const { projectId, me, members, currencies, categories, existing } = props;
   const isMember = members.some((m) => m.userId === me);
+  const startCurrency =
+    existing?.currency ?? (currencies.some((c) => c.code === props.defaultCurrency) ? props.defaultCurrency : "BRL");
 
-  const [amount, setAmount] = useState(existing ? centsToInput(existing.amountCents) : "");
+  const [currency, setCurrency] = useState(startCurrency);
+  const [amount, setAmount] = useState(existing ? minorToInput(existing.amount, existing.currency) : "");
   const [description, setDescription] = useState(existing?.description ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
   const [paidBy, setPaidBy] = useState(existing?.paidBy ?? (isMember ? me : members[0]?.userId));
@@ -57,7 +71,11 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
     if (!existing) amountRef.current?.focus();
   }, [existing]);
 
-  const cents = parseAmountToCents(amount);
+  const rate = currencies.find((c) => c.code === currency)?.rate ?? 1;
+  const minor = parseAmountMinor(amount, currency);
+  // Saldo e divisão são sempre em reais; "cents" é o valor convertido.
+  const cents = minor ? toBrlCents(minor, currency, rate) : null;
+  const foreign = currency !== "BRL";
   const desc = description.trim();
   const lines = cents ? expenseShares(cents, members) : [];
   const category = categories.find((c) => c.id === categoryId);
@@ -74,7 +92,11 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!cents) return toast.err("Digite um valor válido.");
+    if (!minor) {
+      return toast.err(
+        currencyDecimals(currency) === 0 ? `Digite um valor válido (${currency} não tem centavos).` : "Digite um valor válido.",
+      );
+    }
     if (!categoryId) return toast.err("Escolha uma categoria.");
     if (!desc) {
       descRef.current?.focus();
@@ -87,13 +109,14 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
         isNew: !existing,
         projectId,
         description: desc,
-        amountCents: cents,
+        amount: minor,
+        currency,
         paidBy,
         categoryId,
         spentOn: date,
       });
       haptic();
-      toast.ok(existing ? "Despesa atualizada" : `${formatBRL(cents)} lançado`);
+      toast.ok(existing ? "Despesa atualizada" : `${formatMoney(minor, currency)} lançado`);
       back(`/p/${projectId}`);
     } catch (err) {
       toast.err((err as Error).message);
@@ -102,7 +125,7 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
   }
 
   async function remove() {
-    if (!existing || !confirm(`Apagar “${existing.description}” (${formatBRL(existing.amountCents)})?`)) return;
+    if (!existing || !confirm(`Apagar “${existing.description}” (${formatMoney(existing.amount, existing.currency)})?`)) return;
     setBusy(true);
     try {
       await deleteExpense(existing.id);
@@ -126,19 +149,33 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
     <>
       <Header title={existing ? "Editar despesa" : "Nova despesa"} onBack={() => back(`/p/${projectId}`)} action={deleteBtn} />
       <form className="page expense-form" onSubmit={submit}>
+        {currencies.length > 1 && (
+          <div className="segmented" aria-label="Moeda">
+            {currencies.map((c) => (
+              <button type="button" key={c.code} className={currency === c.code ? "active" : ""} onClick={() => setCurrency(c.code)}>
+                {c.code === "BRL" ? "R$" : c.code}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="amount-field">
-          <span className="currency">R$</span>
+          <span className="currency">{foreign ? currency : "R$"}</span>
           <input
             ref={amountRef}
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))}
             inputMode="decimal"
-            placeholder="0,00"
+            placeholder={currencyDecimals(currency) === 0 ? "0" : "0,00"}
             aria-label="Valor"
             enterKeyHint="next"
             autoComplete="off"
           />
         </label>
+        {foreign && (
+          <p className="muted small conversion">
+            {cents ? `≈ ${formatBRL(cents)} · ` : ""}1 {currency} = R$ {String(rate).replace(".", ",")}
+          </p>
+        )}
 
         <div className="field">
           <span>Categoria</span>
@@ -216,8 +253,8 @@ function Form(props: { projectId: string; me: string; members: Member[]; categor
         )}
 
         <div className="sticky-actions">
-          <button className="btn primary big" disabled={busy || !cents || !categoryId || !desc}>
-            {busy ? "Salvando…" : existing ? "Salvar alterações" : cents ? `Lançar ${formatBRL(cents)}` : "Lançar"}
+          <button className="btn primary big" disabled={busy || !minor || !categoryId || !desc}>
+            {busy ? "Salvando…" : existing ? "Salvar alterações" : minor ? `Lançar ${formatMoney(minor, currency)}` : "Lançar"}
           </button>
         </div>
       </form>

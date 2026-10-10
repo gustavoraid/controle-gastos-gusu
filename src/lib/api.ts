@@ -1,9 +1,11 @@
+import { toBrlCents } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
 import type {
   Category,
   Expense,
   Member,
   Project,
+  ProjectCurrency,
   ProjectSummary,
   ProjectType,
   Settlement,
@@ -23,6 +25,9 @@ function translateError(msg: string): string {
   if (msg.includes("category_suggestions_category_id_text_key")) return "Essa sugestão já existe.";
   if (msg.includes("expenses_category_id_fkey"))
     return "Essa categoria tem despesas. Use “Ocultar do lançamento” em vez de excluir.";
+  if (msg.includes("expenses_project_id_currency_fkey"))
+    return "Essa moeda tem despesas lançadas e não pode ser removida.";
+  if (msg.includes("limite de 2 moedas")) return "O projeto aceita no máximo 2 moedas além do real.";
   if (msg.includes("crie as duas contas")) return "Crie as duas contas no Supabase antes do primeiro projeto.";
   return msg;
 }
@@ -42,6 +47,7 @@ const mapProject = (r: any): Project => ({
   name: r.name,
   emoji: r.emoji,
   type: r.type,
+  defaultCurrency: r.default_currency,
   createdBy: r.created_by,
   archived: r.archived,
 });
@@ -51,11 +57,24 @@ const mapMembers = (rows: any[]): Member[] =>
     .map((m) => ({ userId: m.user_id, name: m.profiles?.display_name ?? "?", weight: Number(m.weight) }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
-const mapExpense = (r: any): Expense => ({
+const mapCurrencies = (rows: any[]): ProjectCurrency[] =>
+  rows
+    .map((c) => ({ code: c.code as string, rate: Number(c.rate) }))
+    .sort((a, b) => (a.code === "BRL" ? -1 : b.code === "BRL" ? 1 : a.code.localeCompare(b.code)));
+
+/** Cotações do projeto por moeda. */
+export type Rates = Record<string, number>;
+
+export const ratesOf = (currencies: ProjectCurrency[]): Rates =>
+  Object.fromEntries(currencies.map((c) => [c.code, c.rate]));
+
+const mapExpense = (r: any, rates: Rates): Expense => ({
   id: r.id,
   projectId: r.project_id,
   description: r.description,
-  amountCents: Number(r.amount_cents),
+  amount: Number(r.amount),
+  currency: r.currency,
+  amountCents: toBrlCents(Number(r.amount), r.currency, rates[r.currency] ?? 0),
   paidBy: r.paid_by,
   categoryId: r.category_id,
   spentOn: r.spent_on,
@@ -107,7 +126,7 @@ export async function getProject(id: string) {
   const r = check<any>(
     await supabase
       .from("projects")
-      .select("*, project_members(user_id, weight, profiles(display_name))")
+      .select("*, project_members(user_id, weight, profiles(display_name)), project_currencies(code, rate)")
       .eq("id", id)
       .single(),
   );
@@ -121,6 +140,7 @@ export async function getProject(id: string) {
   return {
     project: mapProject(r),
     members: mapMembers(r.project_members ?? []),
+    currencies: mapCurrencies(r.project_currencies ?? []),
     categories: cats.map(
       (c): Category => ({
         id: c.id,
@@ -143,7 +163,7 @@ export async function getBalances(projectId: string): Promise<Record<string, num
   return Object.fromEntries(rows.map((r) => [r.user_id, Number(r.net_cents)]));
 }
 
-/** copyFrom: projeto cuja proporção, categorias e sugestões serão copiadas. */
+/** copyFrom: projeto cuja proporção, moedas, categorias e sugestões serão copiadas. */
 export async function createProject(name: string, emoji: string, type: ProjectType, copyFrom: string | null) {
   return check<string>(
     await supabase.rpc("create_project", {
@@ -157,7 +177,7 @@ export async function createProject(name: string, emoji: string, type: ProjectTy
 
 export async function updateProject(
   id: string,
-  patch: { name?: string; emoji?: string; type?: ProjectType; archived?: boolean },
+  patch: { name?: string; emoji?: string; type?: ProjectType; default_currency?: string; archived?: boolean },
 ) {
   check(await supabase.from("projects").update(patch).eq("id", id));
 }
@@ -176,6 +196,27 @@ export async function setWeights(projectId: string, weights: Record<string, numb
         .eq("user_id", userId),
     );
   }
+}
+
+// ---------------------------------------------------------------- moedas
+
+async function getRates(projectId: string): Promise<Rates> {
+  const rows = check<any[]>(await supabase.from("project_currencies").select("code, rate").eq("project_id", projectId));
+  return ratesOf(mapCurrencies(rows));
+}
+
+export async function addCurrency(projectId: string, code: string, rate: number) {
+  check(await supabase.from("project_currencies").insert({ project_id: projectId, code, rate }));
+}
+
+export async function setRate(projectId: string, code: string, rate: number) {
+  check(await supabase.from("project_currencies").update({ rate }).eq("project_id", projectId).eq("code", code));
+}
+
+/** Remove uma moeda extra; se ela era a padrão, o real volta a ser o padrão antes. */
+export async function removeCurrency(projectId: string, code: string, wasDefault: boolean) {
+  if (wasDefault) await updateProject(projectId, { default_currency: "BRL" });
+  check(await supabase.from("project_currencies").delete().eq("project_id", projectId).eq("code", code));
 }
 
 // ---------------------------------------------------------------- categorias
@@ -203,6 +244,7 @@ export async function deleteSuggestion(id: string) {
 // ---------------------------------------------------------------- despesas
 
 export async function listMonth(projectId: string, start: string, end: string) {
+  const rates = await getRates(projectId);
   const expenses = await fetchAll<any>((from, to) =>
     supabase
       .from("expenses")
@@ -226,13 +268,12 @@ export async function listMonth(projectId: string, start: string, end: string) {
       .order("id")
       .range(from, to),
   );
-  return { expenses: expenses.map(mapExpense), settlements: settlements.map(mapSettlement) };
+  return { expenses: expenses.map((e) => mapExpense(e, rates)), settlements: settlements.map(mapSettlement) };
 }
 
 export async function getExpense(id: string): Promise<Expense> {
-  return mapExpense(
-    check(await supabase.from("expenses").select("*").eq("id", id).single()),
-  );
+  const r = check<any>(await supabase.from("expenses").select("*").eq("id", id).single());
+  return mapExpense(r, await getRates(r.project_id));
 }
 
 /**
@@ -257,7 +298,9 @@ export async function saveExpense(input: {
   isNew: boolean;
   projectId: string;
   description: string;
-  amountCents: number;
+  /** Na menor unidade da moeda. */
+  amount: number;
+  currency: string;
   paidBy: string;
   categoryId: string;
   spentOn: string;
@@ -266,7 +309,8 @@ export async function saveExpense(input: {
     id: input.id,
     project_id: input.projectId,
     description: input.description,
-    amount_cents: input.amountCents,
+    amount: input.amount,
+    currency: input.currency,
     paid_by: input.paidBy,
     category_id: input.categoryId,
     spent_on: input.spentOn,
@@ -278,10 +322,13 @@ export async function saveExpense(input: {
   }
 }
 
-/** Todas as despesas e acertos do projeto (só o necessário para recalcular saldos). */
+/**
+ * Todas as despesas (na moeda original) e acertos do projeto — o necessário para
+ * prever o saldo com outra proporção ou outra cotação.
+ */
 export async function listAllForBalance(projectId: string) {
   const expenses = await fetchAll<any>((from, to) =>
-    supabase.from("expenses").select("id, paid_by, amount_cents").eq("project_id", projectId).order("id").range(from, to),
+    supabase.from("expenses").select("id, paid_by, amount, currency").eq("project_id", projectId).order("id").range(from, to),
   );
   const settlements = await fetchAll<any>((from, to) =>
     supabase
@@ -292,7 +339,11 @@ export async function listAllForBalance(projectId: string) {
       .range(from, to),
   );
   return {
-    expenses: expenses.map((e) => ({ paidBy: e.paid_by as string, amountCents: Number(e.amount_cents) })),
+    expenses: expenses.map((e) => ({
+      paidBy: e.paid_by as string,
+      amount: Number(e.amount),
+      currency: e.currency as string,
+    })),
     settlements: settlements.map((t) => ({
       fromUser: t.from_user as string,
       toUser: t.to_user as string,
@@ -340,6 +391,7 @@ export function subscribeProject(projectId: string, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "settlements", filter }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "categories", filter }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "project_members", filter }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "project_currencies", filter }, onChange)
     .subscribe();
   return () => {
     supabase.removeChannel(channel);

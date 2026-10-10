@@ -13,7 +13,10 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
 - A proporção de divisão é do projeto (`project_members.weight`) e é recalculada retroativamente
   (decisão do dono): nada de divisão gravada por despesa. A view `expense_shares` (SQL) e
   `expenseShares()` (TS) têm que dar o mesmo centavo — maior resto, empate pelo menor user_id.
-- Dinheiro sempre em centavos inteiros (`bigint` no banco). Nunca some floats de reais.
+- Dinheiro sempre em inteiros na menor unidade da moeda (`bigint`). Despesa guarda o valor na moeda
+  original (`amount` + `currency`); o valor em reais é calculado na leitura pela cotação do projeto
+  (`project_currencies.rate`, retroativa). `expense_values` (SQL) e `toBrlCents()` (TS) têm que dar o
+  mesmo centavo. Nunca some floats de reais.
 - "Hoje" sempre por `todayISO()` (fuso de Brasília), nunca `toISOString()`.
 - Rotas por hash (`#/p/:id`) para funcionar em hospedagem estática sem rewrite.
 - Consultas que podem passar de 1000 linhas usam `fetchAll` (teto do PostgREST).

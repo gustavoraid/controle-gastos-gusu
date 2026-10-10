@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeNets, expenseImpact, suggestTransfers } from "./balances";
+import { computeNets, expenseImpact, inBrl, suggestTransfers } from "./balances";
 
 describe("suggestTransfers", () => {
   it("casal: um único pagamento", () => {
@@ -78,5 +78,17 @@ describe("computeNets", () => {
       [{ userId: "ana", weight: 70 }, { userId: "beto", weight: 30 }],
     );
     expect(nets.ana + nets.beto).toBe(0);
+  });
+});
+
+describe("inBrl + computeNets com moedas", () => {
+  it("mudar a cotação recalcula o saldo", () => {
+    const meio = [
+      { userId: "ana", weight: 1 },
+      { userId: "beto", weight: 1 },
+    ];
+    const despesas = [{ paidBy: "ana", amount: 25000, currency: "CLP" }];
+    expect(computeNets(inBrl(despesas, { BRL: 1, CLP: 0.0062 }), [], meio)).toEqual({ ana: 7750, beto: -7750 });
+    expect(computeNets(inBrl(despesas, { BRL: 1, CLP: 0.006 }), [], meio)).toEqual({ ana: 7500, beto: -7500 });
   });
 });

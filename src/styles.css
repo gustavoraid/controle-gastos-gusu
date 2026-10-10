@@ -625,6 +625,10 @@ select:focus {
   text-align: left;
   font-variant-numeric: tabular-nums;
 }
+.conversion {
+  text-align: center;
+  margin-top: -8px;
+}
 .desc-input {
   text-align: center;
 }
@@ -735,6 +739,22 @@ select:focus {
   text-align: center;
   padding: 8px !important;
   font-size: 20px !important;
+}
+.currency-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.currency-list > li + li {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.currency-select {
+  width: auto !important;
+  max-width: 55%;
 }
 .cat-edit-list {
   list-style: none;

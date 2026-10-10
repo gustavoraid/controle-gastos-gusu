@@ -17,6 +17,7 @@ export interface Project {
   name: string;
   emoji: string;
   type: ProjectType;
+  defaultCurrency: string;
   createdBy: string;
   archived: boolean;
 }
@@ -36,10 +37,20 @@ export interface Suggestion {
   position: number;
 }
 
+/** Moeda aceita no projeto; rate = reais por 1 unidade (BRL = 1). */
+export interface ProjectCurrency {
+  code: string;
+  rate: number;
+}
+
 export interface Expense {
   id: string;
   projectId: string;
   description: string;
+  /** Valor na moeda da despesa, na menor unidade. */
+  amount: number;
+  currency: string;
+  /** Valor em centavos de real pela cotação atual do projeto (é o que entra no saldo). */
   amountCents: number;
   paidBy: string;
   categoryId: string | null;
