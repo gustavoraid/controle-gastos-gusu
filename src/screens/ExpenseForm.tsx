@@ -85,6 +85,21 @@ function Form(props: {
   const yesterday = addDaysISO(today, -1);
   const dayBefore = addDaysISO(today, -2);
 
+  const otherDate = ![today, yesterday, dayBefore].includes(date);
+  // Conversão e divisão em texto pequeno logo abaixo do valor (uma linha cada).
+  const info: string[] = [];
+  if (foreign) {
+    const rateText = `1 ${currency} = R$ ${String(rate).replace(".", ",")}`;
+    info.push(cents ? `≈ ${formatBRL(cents)} · ${rateText}` : rateText);
+  }
+  if (members.length > 1) {
+    info.push(
+      cents
+        ? lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" / ")
+        : `Divisão ${pct.join(" / ")}`,
+    );
+  }
+
   function pickCategory(id: string) {
     // Descrição que veio de sugestão da categoria anterior não faz sentido na nova.
     if (id !== categoryId && category?.suggestions.some((sg) => sg.text === desc)) setDescription("");
@@ -149,18 +164,20 @@ function Form(props: {
   return (
     <>
       <Header title={existing ? "Editar despesa" : "Nova despesa"} onBack={() => back(`/p/${projectId}`)} action={deleteBtn} />
-      <form className="page expense-form" onSubmit={submit}>
-        {currencies.length > 1 && (
-          <div className="segmented" aria-label="Moeda">
-            {currencies.map((c) => (
-              <button type="button" key={c.code} className={currency === c.code ? "active" : ""} onClick={() => setCurrency(c.code)}>
-                {c.code === "BRL" ? "R$" : c.code}
-              </button>
-            ))}
-          </div>
-        )}
+      <form className="page expense-form compact" onSubmit={submit}>
         <label className="amount-field">
-          <span className="currency">{foreign ? currency : "R$"}</span>
+          {currencies.length > 1 ? (
+            <button
+              type="button"
+              className="currency-btn"
+              onClick={() => setCurrency(currencies[(currencies.findIndex((c) => c.code === currency) + 1) % currencies.length].code)}
+              aria-label={`Moeda: ${currency}. Toque para trocar`}
+            >
+              {foreign ? currency : "R$"} <span aria-hidden="true">▾</span>
+            </button>
+          ) : (
+            <span className="currency">R$</span>
+          )}
           <input
             ref={amountRef}
             value={amount}
@@ -172,37 +189,34 @@ function Form(props: {
             autoComplete="off"
           />
         </label>
-        {foreign && (
+        {info.length > 0 && (
           <p className="muted small conversion">
-            {cents ? `≈ ${formatBRL(cents)} · ` : ""}1 {currency} = R$ {String(rate).replace(".", ",")}
+            {info.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
           </p>
         )}
 
-        <div className="field">
-          <span>Categoria</span>
-          <div className="cat-grid">
-            {categories.map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                className={`cat-pick ${categoryId === c.id ? "active" : ""}`}
-                onClick={() => pickCategory(c.id)}
-                aria-pressed={categoryId === c.id}
-              >
-                <span className="emoji-lg">{c.emoji}</span>
-                <span className="cat-name">{c.name}</span>
-              </button>
-            ))}
-          </div>
+        <div className="cat-chips" role="group" aria-label="Categoria">
+          {categories.map((c) => (
+            <button
+              type="button"
+              key={c.id}
+              className={`chip cat-chip ${categoryId === c.id ? "active" : ""}`}
+              onClick={() => pickCategory(c.id)}
+              aria-pressed={categoryId === c.id}
+            >
+              <span aria-hidden="true">{c.emoji}</span> {c.name}
+            </button>
+          ))}
         </div>
 
-        <div className="field">
-          <span>Descrição</span>
+        <div className="stack-sm">
           <input
             ref={descRef}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={category?.suggestions.length ? "Toque numa sugestão ou escreva" : "Ex.: Supermercado, Luz, Jantar"}
+            placeholder={category?.suggestions.length ? "Descrição: toque numa sugestão ou escreva" : "Descrição (ex.: Jantar, Táxi)"}
             maxLength={120}
             aria-label="Descrição"
             aria-required="true"
@@ -221,9 +235,9 @@ function Form(props: {
         </div>
 
         {members.length > 1 && (
-          <div className="field">
-            <span>Quem pagou</span>
-            <div className="segmented">
+          <div className="row gap-sm">
+            <span className="muted small">Pagou:</span>
+            <div className="segmented grow">
               {members.map((m) => (
                 <button type="button" key={m.userId} className={paidBy === m.userId ? "active" : ""} onClick={() => setPaidBy(m.userId)}>
                   {m.userId === me ? "Eu" : m.name}
@@ -233,28 +247,22 @@ function Form(props: {
           </div>
         )}
 
-        <div className="field">
-          <span>Quando</span>
-          <div className="chips">
-            <Chip active={date === today} onClick={() => setDate(today)}>
-              Hoje
-            </Chip>
-            <Chip active={date === yesterday} onClick={() => setDate(yesterday)}>
-              Ontem
-            </Chip>
-            <Chip active={date === dayBefore} onClick={() => setDate(dayBefore)}>
-              Anteontem
-            </Chip>
-            <input type="date" className={`chip date-chip ${![today, yesterday, dayBefore].includes(date) ? "active" : ""}`} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
-          </div>
+        <div className="chips" role="group" aria-label="Data">
+          <Chip active={date === today} onClick={() => setDate(today)}>
+            Hoje
+          </Chip>
+          <Chip active={date === yesterday} onClick={() => setDate(yesterday)}>
+            Ontem
+          </Chip>
+          <Chip active={date === dayBefore} onClick={() => setDate(dayBefore)}>
+            Anteontem
+          </Chip>
+          {/* input de data invisível por cima do chip: tocar abre o calendário nativo */}
+          <label className={`chip date-pick ${otherDate ? "active" : ""}`}>
+            📅 {otherDate ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : "Outra"}
+            <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
+          </label>
         </div>
-
-        {members.length > 1 && (
-          <p className="muted small split-preview">
-            Divisão do projeto ({pct.join(" / ")})
-            {cents ? `: ${lines.map((l) => `${name(l.userId)} ${formatBRL(l.amountCents)}`).join(" · ")}` : ""}
-          </p>
-        )}
 
         <div className="sticky-actions">
           <button className="btn primary big" disabled={busy || !minor || !categoryId || !desc}>
