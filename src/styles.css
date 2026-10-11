@@ -894,3 +894,39 @@ select:focus {
   text-align: right;
   flex: none;
 }
+
+/* ------------------------------------------------------------ reordenar */
+
+.drag-handle {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 36px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: grab;
+  /* sem isso o navegador do celular rola a tela em vez de arrastar */
+  touch-action: none;
+}
+li.dragging {
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.day-head .btn.link {
+  font-size: 13px;
+  padding: 4px 6px;
+}
+.reorder-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}

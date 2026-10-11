@@ -56,6 +56,8 @@ export interface Expense {
   categoryId: string | null;
   spentOn: string;
   createdAt: string;
+  /** Ordem dentro do dia: maior = mais acima (nasce com o instante do lançamento). */
+  sortKey: number;
 }
 
 export interface Settlement {

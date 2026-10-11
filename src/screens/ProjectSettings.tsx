@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { SortableList } from "@/components/SortableList";
 import { Avatar, ErrorBox, Header, Loading, toast } from "@/components/ui";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
@@ -31,6 +32,7 @@ import {
   toBrlCents,
 } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
+import { moveItem } from "@/lib/order";
 import { parseWeight, percentLabels } from "@/lib/split";
 import {
   PROJECT_TYPES,
@@ -391,6 +393,22 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🏷️");
   const [open, setOpen] = useState<string | null>(null);
+  // Ordem local para o arrasto responder na hora; sincroniza quando o banco recarrega.
+  const [order, setOrder] = useState(categories);
+  useEffect(() => setOrder(categories), [categories]);
+
+  async function move(from: number, to: number) {
+    const next = moveItem(order, from, to);
+    setOrder(next);
+    const changed = next.map((c, i) => ({ c, pos: i + 1 })).filter(({ c, pos }) => c.position !== pos);
+    try {
+      await Promise.all(changed.map(({ c, pos }) => updateCategory(c.id, { position: pos })));
+      onChange();
+    } catch (err) {
+      toast.err((err as Error).message);
+      setOrder(categories);
+    }
+  }
 
   async function run(fn: () => Promise<void>, ok?: string) {
     try {
@@ -409,11 +427,19 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Categorias e descrições sugeridas</h2>
-      <p className="muted small">As sugestões aparecem como atalho ao lançar uma despesa na categoria.</p>
-      <ul className="cat-edit-list">
-        {categories.map((c) => (
-          <li key={c.id} className={c.archived ? "dim" : ""}>
+      <p className="muted small">
+        Arraste pela alça ≡ para mudar a ordem (é a ordem dos botões ao lançar). As sugestões aparecem como atalho ao
+        lançar uma despesa na categoria.
+      </p>
+      <SortableList
+        className="cat-edit-list"
+        items={order}
+        getId={(c) => c.id}
+        onMove={move}
+        renderItem={(c, handle) => (
+          <div className={`stack-sm ${c.archived ? "dim" : ""}`}>
             <div className="cat-edit-row">
+              {handle}
               <input key={c.emoji} className="emoji-input" defaultValue={c.emoji} aria-label="Emoji" onBlur={(e) => e.target.value.trim() && e.target.value !== c.emoji && run(() => updateCategory(c.id, { emoji: e.target.value.trim() }))} />
               <input key={c.name} className="grow" defaultValue={c.name} aria-label="Nome da categoria" maxLength={40} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(() => updateCategory(c.id, { name: e.target.value.trim() }), "Categoria renomeada")} />
               <button className="btn small ghost" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
@@ -425,12 +451,12 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
                 category={c}
                 run={run}
                 onArchive={() => run(() => updateCategory(c.id, { archived: !c.archived }))}
-                onDelete={() => confirm(`Excluir “${c.name}”? As despesas dela ficam sem categoria.`) && run(() => deleteCategory(c.id), "Categoria excluída")}
+                onDelete={() => confirm(`Excluir “${c.name}”?`) && run(() => deleteCategory(c.id), "Categoria excluída")}
               />
             )}
-          </li>
-        ))}
-      </ul>
+          </div>
+        )}
+      />
       <form
         className="row gap-sm"
         onSubmit={async (e) => {
