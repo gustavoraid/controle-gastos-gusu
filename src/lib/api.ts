@@ -79,6 +79,7 @@ const mapExpense = (r: any, rates: Rates): Expense => ({
   categoryId: r.category_id,
   spentOn: r.spent_on,
   createdAt: r.created_at,
+  sortKey: Number(r.sort_key ?? Date.parse(r.created_at) / 1000),
 });
 
 const mapSettlement = (r: any): Settlement => ({
@@ -255,7 +256,7 @@ export async function listActivity(projectId: string, range?: { start: string; e
     if (range) q = q.gte("spent_on", range.start).lte("spent_on", range.end);
     return q
       .order("spent_on", { ascending: false })
-      .order("created_at", { ascending: false })
+      .order("sort_key", { ascending: false })
       .order("id")
       .range(from, to);
   });
@@ -346,6 +347,13 @@ export async function listAllForBalance(projectId: string) {
       amountCents: Number(t.amount_cents),
     })),
   };
+}
+
+/** Grava a nova ordem manual de despesas de um dia (só as que mudaram). */
+export async function setSortKeys(changes: { id: string; key: number }[]) {
+  for (const c of changes) {
+    check(await supabase.from("expenses").update({ sort_key: c.key }).eq("id", c.id));
+  }
 }
 
 export async function deleteExpense(id: string) {

@@ -1,22 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { SortableList } from "@/components/SortableList";
 import { Avatar, ErrorBox, Header, Loading, Money, PERSON_COLORS, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
-import { deleteSettlement, listActivity } from "@/lib/api";
+import { deleteSettlement, listActivity, setSortKeys } from "@/lib/api";
 import { suggestTransfers } from "@/lib/balances";
 import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
+import { moveItem, reorderKeys } from "@/lib/order";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 
-type Item = { kind: "e"; date: string; at: string; e: Expense } | { kind: "s"; date: string; at: string; s: Settlement };
+// key: ordem dentro do dia (maior = mais acima). Despesa usa sort_key; acerto, o instante em que foi criado.
+type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; date: string; key: number; s: Settlement };
 
 export function ProjectScreen({ id, me }: { id: string; me: string }) {
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [tab, setTab] = useState<"lista" | "resumo">("lista");
+  const [reordering, setReordering] = useState(false);
   const reloadActivity = useRef<() => void>(undefined);
   const proj = useProject(id, () => reloadActivity.current?.());
   // Viagem mostra tudo de uma vez (sem navegação por mês); os outros tipos, mês a mês.
@@ -78,13 +82,26 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         </nav>
         )}
 
-        <div className="segmented" role="tablist">
-          <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")}>
-            Lançamentos
-          </button>
-          <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")}>
-            {isTrip ? "Resumo" : "Resumo do mês"}
-          </button>
+        <div className="tabs-row">
+          <div className="segmented" role="tablist">
+            <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
+              Lançamentos
+            </button>
+            <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
+              {isTrip ? "Resumo" : "Resumo do mês"}
+            </button>
+          </div>
+          {tab === "lista" && activity.data && hasDayToReorder(activity.data.expenses) && (
+            <button
+              className={`icon-btn reorder-btn ${reordering ? "active" : ""}`}
+              aria-label="Reordenar despesas"
+              aria-pressed={reordering}
+              onClick={() => setReordering(true)}
+              disabled={reordering}
+            >
+              ⇅
+            </button>
+          )}
         </div>
 
         {activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
@@ -100,6 +117,8 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             expenses={activity.data.expenses}
             settlements={activity.data.settlements}
             emptyText={isTrip ? "Nada lançado nesta viagem ainda." : "Nada lançado neste mês."}
+            reordering={reordering}
+            onExitReorder={() => setReordering(false)}
             onChanged={() => {
               activity.reload();
               proj.reload();
@@ -121,11 +140,20 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         )}
       </main>
 
-      <button className="fab" onClick={() => go(`/p/${id}/add`)} aria-label="Adicionar despesa">
-        <span aria-hidden="true">+</span> Despesa
-      </button>
+      {!reordering && (
+        <button className="fab" onClick={() => go(`/p/${id}/add`)} aria-label="Adicionar despesa">
+          <span aria-hidden="true">+</span> Despesa
+        </button>
+      )}
     </>
   );
+}
+
+/** Há algum dia com 2+ despesas (senão não há o que reordenar). */
+function hasDayToReorder(expenses: Expense[]): boolean {
+  const perDay = new Map<string, number>();
+  for (const e of expenses) perDay.set(e.spentOn, (perDay.get(e.spentOn) ?? 0) + 1);
+  return [...perDay.values()].some((n) => n > 1);
 }
 
 function BalanceBanner(props: {
@@ -184,22 +212,18 @@ function ActivityList(props: {
   expenses: Expense[];
   settlements: Settlement[];
   emptyText: string;
+  reordering: boolean;
+  onExitReorder: () => void;
   onChanged: () => void;
 }) {
   const { me, names, cats } = props;
+  // Modo reordenar: rascunho da ordem de cada dia (data → despesas de cima para baixo).
+  const [draft, setDraft] = useState<Record<string, Expense[]>>({});
+  const [saving, setSaving] = useState(false);
   const items: Item[] = [
-    ...props.expenses.map((e): Item => ({ kind: "e", date: e.spentOn, at: e.createdAt, e })),
-    ...props.settlements.map((s): Item => ({ kind: "s", date: s.settledOn, at: s.createdAt, s })),
-  ].sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at));
-
-  if (items.length === 0) {
-    return (
-      <div className="empty">
-        <p className="empty-emoji">🧾</p>
-        <p>{props.emptyText}</p>
-      </div>
-    );
-  }
+    ...props.expenses.map((e): Item => ({ kind: "e", date: e.spentOn, key: e.sortKey, e })),
+    ...props.settlements.map((s): Item => ({ kind: "s", date: s.settledOn, key: Date.parse(s.createdAt) / 1000, s })),
+  ].sort((a, b) => b.date.localeCompare(a.date) || b.key - a.key);
 
   const groups: { date: string; items: Item[] }[] = [];
   for (const it of items) {
@@ -218,6 +242,89 @@ function ActivityList(props: {
     } catch (err) {
       toast.err((err as Error).message);
     }
+  }
+
+  const dayExpenses = (g: { items: Item[] }) => g.items.flatMap((it) => (it.kind === "e" ? [it.e] : []));
+
+  // Ao entrar no modo, o rascunho começa com a ordem atual de cada dia.
+  useEffect(() => {
+    if (props.reordering) setDraft(Object.fromEntries(groups.map((g) => [g.date, dayExpenses(g)])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.reordering]);
+
+  if (items.length === 0) {
+    return (
+      <div className="empty">
+        <p className="empty-emoji">🧾</p>
+        <p>{props.emptyText}</p>
+      </div>
+    );
+  }
+
+  async function finishReorder() {
+    const changes = groups.flatMap((g) => {
+      const original = dayExpenses(g);
+      const next = draft[g.date] ?? original;
+      return reorderKeys(
+        original.map((e) => ({ id: e.id, key: e.sortKey })),
+        next.map((e) => e.id),
+      );
+    });
+    if (changes.length === 0) return props.onExitReorder();
+    setSaving(true);
+    try {
+      await setSortKeys(changes);
+      toast.ok("Ordem salva");
+      props.onExitReorder();
+      props.onChanged();
+    } catch (err) {
+      toast.err((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const row = (e: Expense, handle?: ReactNode) => (
+    <ExpenseRow e={e} me={me} names={names} color={props.colors.get(e.paidBy)} cat={e.categoryId ? cats.get(e.categoryId) : undefined} projectId={props.projectId} handle={handle} />
+  );
+
+  if (props.reordering) {
+    return (
+      <div className="activity reordering">
+        <p className="muted small">Arraste pela alça ≡. As despesas só mudam de posição dentro do próprio dia.</p>
+        {groups.map((g) => {
+          const exp = draft[g.date] ?? dayExpenses(g);
+          if (exp.length === 0) return null;
+          return (
+            <section key={g.date}>
+              <h2 className="day-label">{dayLabel(g.date)}</h2>
+              {exp.length > 1 ? (
+                // Um SortableList por dia: o arrasto não atravessa dias (não muda data).
+                <SortableList
+                  className="list"
+                  items={exp}
+                  getId={(e) => e.id}
+                  onMove={(from, to) => setDraft({ ...draft, [g.date]: moveItem(exp, from, to) })}
+                  renderItem={(e, handle) => row(e, handle)}
+                />
+              ) : (
+                <ul className="list">
+                  <li>{row(exp[0], <span className="drag-handle off" aria-hidden="true" />)}</li>
+                </ul>
+              )}
+            </section>
+          );
+        })}
+        <div className="reorder-bar">
+          <button className="btn ghost grow" onClick={props.onExitReorder} disabled={saving}>
+            Cancelar
+          </button>
+          <button className="btn primary grow" onClick={finishReorder} disabled={saving}>
+            {saving ? "Salvando…" : "Concluir"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -261,13 +368,14 @@ function ExpenseRow(props: {
   color?: string;
   cat?: Category;
   projectId: string;
+  /** Alça de arrastar: quando presente, a linha está no modo "Reordenar" (sem abrir a despesa). */
+  handle?: ReactNode;
 }) {
   const { e, me, names, cat } = props;
   const payerName = names.get(e.paidBy) ?? "?";
-
-  return (
-    <li>
-      <button className="list-item compact" onClick={() => go(`/p/${props.projectId}/add?e=${e.id}`)}>
+  const content = (
+    <>
+        {props.handle}
         <span className="cat-badge sm">{cat?.emoji ?? "📦"}</span>
         <span className="grow min0">
           <strong className="ellipsis">{e.description}</strong>
@@ -281,6 +389,15 @@ function ExpenseRow(props: {
           <span className="money">{formatMoney(e.amount, e.currency)}</span>
           {e.currency !== "BRL" && <span className="muted small">≈ {formatBRL(e.amountCents)}</span>}
         </span>
+    </>
+  );
+
+  // No modo reordenar o <li> vem do SortableList; fora dele, a linha abre a despesa.
+  if (props.handle) return <div className="list-item compact reorder">{content}</div>;
+  return (
+    <li>
+      <button className="list-item compact" onClick={() => go(`/p/${props.projectId}/add?e=${e.id}`)}>
+        {content}
       </button>
     </li>
   );

@@ -894,3 +894,56 @@ select:focus {
   text-align: right;
   flex: none;
 }
+
+/* ------------------------------------------------------------ reordenar */
+
+.drag-handle {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 36px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: grab;
+  /* sem isso o navegador do celular rola a tela em vez de arrastar */
+  touch-action: none;
+}
+li.dragging {
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+.drag-handle.off {
+  visibility: hidden;
+}
+.tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tabs-row .segmented {
+  flex: 1;
+}
+.reorder-btn {
+  font-size: 22px;
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+.activity.reordering {
+  padding-bottom: calc(80px + var(--safe-bottom));
+}
+.reorder-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px calc(12px + var(--safe-bottom));
+  background: linear-gradient(to top, var(--bg) 75%, transparent);
+  max-width: 560px;
+  margin: 0 auto;
+}
