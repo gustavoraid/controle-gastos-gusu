@@ -20,6 +20,7 @@ type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; 
 export function ProjectScreen({ id, me }: { id: string; me: string }) {
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [tab, setTab] = useState<"lista" | "resumo">("lista");
+  const [reordering, setReordering] = useState(false);
   const reloadActivity = useRef<() => void>(undefined);
   const proj = useProject(id, () => reloadActivity.current?.());
   // Viagem mostra tudo de uma vez (sem navegação por mês); os outros tipos, mês a mês.
@@ -81,13 +82,26 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         </nav>
         )}
 
-        <div className="segmented" role="tablist">
-          <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")}>
-            Lançamentos
-          </button>
-          <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")}>
-            {isTrip ? "Resumo" : "Resumo do mês"}
-          </button>
+        <div className="tabs-row">
+          <div className="segmented" role="tablist">
+            <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
+              Lançamentos
+            </button>
+            <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
+              {isTrip ? "Resumo" : "Resumo do mês"}
+            </button>
+          </div>
+          {tab === "lista" && activity.data && hasDayToReorder(activity.data.expenses) && (
+            <button
+              className={`icon-btn reorder-btn ${reordering ? "active" : ""}`}
+              aria-label="Reordenar despesas"
+              aria-pressed={reordering}
+              onClick={() => setReordering(true)}
+              disabled={reordering}
+            >
+              ⇅
+            </button>
+          )}
         </div>
 
         {activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
@@ -103,6 +117,8 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             expenses={activity.data.expenses}
             settlements={activity.data.settlements}
             emptyText={isTrip ? "Nada lançado nesta viagem ainda." : "Nada lançado neste mês."}
+            reordering={reordering}
+            onExitReorder={() => setReordering(false)}
             onChanged={() => {
               activity.reload();
               proj.reload();
@@ -124,11 +140,20 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         )}
       </main>
 
-      <button className="fab" onClick={() => go(`/p/${id}/add`)} aria-label="Adicionar despesa">
-        <span aria-hidden="true">+</span> Despesa
-      </button>
+      {!reordering && (
+        <button className="fab" onClick={() => go(`/p/${id}/add`)} aria-label="Adicionar despesa">
+          <span aria-hidden="true">+</span> Despesa
+        </button>
+      )}
     </>
   );
+}
+
+/** Há algum dia com 2+ despesas (senão não há o que reordenar). */
+function hasDayToReorder(expenses: Expense[]): boolean {
+  const perDay = new Map<string, number>();
+  for (const e of expenses) perDay.set(e.spentOn, (perDay.get(e.spentOn) ?? 0) + 1);
+  return [...perDay.values()].some((n) => n > 1);
 }
 
 function BalanceBanner(props: {
@@ -187,25 +212,18 @@ function ActivityList(props: {
   expenses: Expense[];
   settlements: Settlement[];
   emptyText: string;
+  reordering: boolean;
+  onExitReorder: () => void;
   onChanged: () => void;
 }) {
   const { me, names, cats } = props;
-  const [reorderDay, setReorderDay] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Expense[]>([]);
+  // Modo reordenar: rascunho da ordem de cada dia (data → despesas de cima para baixo).
+  const [draft, setDraft] = useState<Record<string, Expense[]>>({});
   const [saving, setSaving] = useState(false);
   const items: Item[] = [
     ...props.expenses.map((e): Item => ({ kind: "e", date: e.spentOn, key: e.sortKey, e })),
     ...props.settlements.map((s): Item => ({ kind: "s", date: s.settledOn, key: Date.parse(s.createdAt) / 1000, s })),
   ].sort((a, b) => b.date.localeCompare(a.date) || b.key - a.key);
-
-  if (items.length === 0) {
-    return (
-      <div className="empty">
-        <p className="empty-emoji">🧾</p>
-        <p>{props.emptyText}</p>
-      </div>
-    );
-  }
 
   const groups: { date: string; items: Item[] }[] = [];
   for (const it of items) {
@@ -226,25 +244,38 @@ function ActivityList(props: {
     }
   }
 
-  const dayExpenses = (g: { items: Item[] }) =>
-    g.items.flatMap((it) => (it.kind === "e" ? [it.e] : []));
+  const dayExpenses = (g: { items: Item[] }) => g.items.flatMap((it) => (it.kind === "e" ? [it.e] : []));
 
-  function startReorder(date: string, list: Expense[]) {
-    setReorderDay(date);
-    setDraft(list);
+  // Ao entrar no modo, o rascunho começa com a ordem atual de cada dia.
+  useEffect(() => {
+    if (props.reordering) setDraft(Object.fromEntries(groups.map((g) => [g.date, dayExpenses(g)])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.reordering]);
+
+  if (items.length === 0) {
+    return (
+      <div className="empty">
+        <p className="empty-emoji">🧾</p>
+        <p>{props.emptyText}</p>
+      </div>
+    );
   }
 
-  async function finishReorder(original: Expense[]) {
-    const changes = reorderKeys(
-      original.map((e) => ({ id: e.id, key: e.sortKey })),
-      draft.map((e) => e.id),
-    );
-    if (changes.length === 0) return setReorderDay(null);
+  async function finishReorder() {
+    const changes = groups.flatMap((g) => {
+      const original = dayExpenses(g);
+      const next = draft[g.date] ?? original;
+      return reorderKeys(
+        original.map((e) => ({ id: e.id, key: e.sortKey })),
+        next.map((e) => e.id),
+      );
+    });
+    if (changes.length === 0) return props.onExitReorder();
     setSaving(true);
     try {
       await setSortKeys(changes);
       toast.ok("Ordem salva");
-      setReorderDay(null);
+      props.onExitReorder();
       props.onChanged();
     } catch (err) {
       toast.err((err as Error).message);
@@ -253,42 +284,54 @@ function ActivityList(props: {
     }
   }
 
+  const row = (e: Expense, handle?: ReactNode) => (
+    <ExpenseRow e={e} me={me} names={names} color={props.colors.get(e.paidBy)} cat={e.categoryId ? cats.get(e.categoryId) : undefined} projectId={props.projectId} handle={handle} />
+  );
+
+  if (props.reordering) {
+    return (
+      <div className="activity reordering">
+        <p className="muted small">Arraste pela alça ≡. As despesas só mudam de posição dentro do próprio dia.</p>
+        {groups.map((g) => {
+          const exp = draft[g.date] ?? dayExpenses(g);
+          if (exp.length === 0) return null;
+          return (
+            <section key={g.date}>
+              <h2 className="day-label">{dayLabel(g.date)}</h2>
+              {exp.length > 1 ? (
+                // Um SortableList por dia: o arrasto não atravessa dias (não muda data).
+                <SortableList
+                  className="list"
+                  items={exp}
+                  getId={(e) => e.id}
+                  onMove={(from, to) => setDraft({ ...draft, [g.date]: moveItem(exp, from, to) })}
+                  renderItem={(e, handle) => row(e, handle)}
+                />
+              ) : (
+                <ul className="list">
+                  <li>{row(exp[0], <span className="drag-handle off" aria-hidden="true" />)}</li>
+                </ul>
+              )}
+            </section>
+          );
+        })}
+        <div className="reorder-bar">
+          <button className="btn ghost grow" onClick={props.onExitReorder} disabled={saving}>
+            Cancelar
+          </button>
+          <button className="btn primary grow" onClick={finishReorder} disabled={saving}>
+            {saving ? "Salvando…" : "Concluir"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="activity">
-      {groups.map((g) => {
-        const exp = dayExpenses(g);
-        const editing = reorderDay === g.date;
-        return (
+      {groups.map((g) => (
         <section key={g.date}>
-          <div className="day-head">
-            <h2 className="day-label">{dayLabel(g.date)}</h2>
-            {exp.length > 1 && !editing && (
-              <button className="btn link" onClick={() => startReorder(g.date, exp)} disabled={reorderDay !== null}>
-                Reordenar
-              </button>
-            )}
-          </div>
-          {editing ? (
-            <>
-              <SortableList
-                className="list"
-                items={draft}
-                getId={(e) => e.id}
-                onMove={(from, to) => setDraft(moveItem(draft, from, to))}
-                renderItem={(e, handle) => (
-                  <ExpenseRow e={e} me={me} names={names} color={props.colors.get(e.paidBy)} cat={e.categoryId ? cats.get(e.categoryId) : undefined} projectId={props.projectId} handle={handle} />
-                )}
-              />
-              <div className="reorder-bar">
-                <button className="btn small ghost" onClick={() => setReorderDay(null)} disabled={saving}>
-                  Cancelar
-                </button>
-                <button className="btn small primary" onClick={() => finishReorder(exp)} disabled={saving}>
-                  {saving ? "Salvando…" : "Concluir"}
-                </button>
-              </div>
-            </>
-          ) : (
+          <h2 className="day-label">{dayLabel(g.date)}</h2>
           <ul className="list">
             {g.items.map((it) =>
               it.kind === "e" ? (
@@ -312,10 +355,8 @@ function ActivityList(props: {
               ),
             )}
           </ul>
-          )}
         </section>
-        );
-      })}
+      ))}
     </div>
   );
 }
