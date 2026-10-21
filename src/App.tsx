@@ -5,6 +5,7 @@ import { go, useRoute } from "@/hooks/useRoute";
 import { supabaseConfigured } from "@/lib/supabase";
 import { getLastProject } from "@/lib/storage";
 import { ExpenseForm } from "@/screens/ExpenseForm";
+import { Activity } from "@/screens/Activity";
 import { Login } from "@/screens/Login";
 import { NewProject } from "@/screens/NewProject";
 import { ProjectScreen } from "@/screens/Project";
@@ -51,6 +52,7 @@ function Routes() {
   const [a, b, c] = parts;
 
   if (a === "novo") return <NewProject me={me} />;
+  if (a === "atividades") return <Activity me={me} />;
   if (a === "p" && b) {
     if (c === "add") return <ExpenseForm projectId={b} expenseId={params.get("e")} me={me} />;
     if (c === "acertar") return <Settle projectId={b} me={me} />;

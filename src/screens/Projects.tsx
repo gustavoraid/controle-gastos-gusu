@@ -29,7 +29,17 @@ export function Projects({ me }: { me: string }) {
 
   return (
     <>
-      <Header title="Gastos GuSu" action={menu} />
+      <Header
+        title="Gastos GuSu"
+        left={
+          <button className="icon-btn" aria-label="Atividades recentes" onClick={() => go("/atividades")}>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 21h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        }
+        action={menu}
+      />
       <main className="page">
         {error && <ErrorBox message={error} onRetry={reload} />}
         {!data && !error && <Loading />}

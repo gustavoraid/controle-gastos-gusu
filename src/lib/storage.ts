@@ -18,3 +18,23 @@ export function setLastProject(id: string) {
     /* ignora */
   }
 }
+
+const FEED_SEEN = "gc:atividadesVistas";
+
+/** Momento (ms) da última visita à tela Atividades neste aparelho. */
+export function getFeedSeen(): number | null {
+  try {
+    const v = localStorage.getItem(FEED_SEEN);
+    return v ? Number(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setFeedSeen(ms: number) {
+  try {
+    localStorage.setItem(FEED_SEEN, String(ms));
+  } catch {
+    /* ignora */
+  }
+}

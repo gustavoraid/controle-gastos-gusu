@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { formatBRL } from "@/lib/money";
 
-export function Header(props: { title: ReactNode; onBack?: () => void; action?: ReactNode }) {
+export function Header(props: { title: ReactNode; onBack?: () => void; left?: ReactNode; action?: ReactNode }) {
   return (
     <header className="topbar">
       {props.onBack ? (
@@ -11,7 +11,7 @@ export function Header(props: { title: ReactNode; onBack?: () => void; action?: 
           </svg>
         </button>
       ) : (
-        <span className="icon-btn-spacer" />
+        props.left ?? <span className="icon-btn-spacer" />
       )}
       <h1 className="topbar-title">{props.title}</h1>
       {props.action ?? <span className="icon-btn-spacer" />}

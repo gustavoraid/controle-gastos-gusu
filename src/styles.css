@@ -969,3 +969,40 @@ li.dragging {
   max-width: 560px;
   margin: 0 auto;
 }
+
+/* ------------------------------------------------------------ atividades */
+
+.feed-item {
+  position: relative;
+}
+.feed-title {
+  font-weight: 600;
+  line-height: 1.25;
+  /* até duas linhas: descrições longas não empurram o valor */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.feed-item.unseen {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.unseen-dot {
+  position: absolute;
+  top: 10px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.feed-changes {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  opacity: 0.8;
+}
+.amount-col.struck .money {
+  text-decoration: line-through;
+  opacity: 0.6;
+}

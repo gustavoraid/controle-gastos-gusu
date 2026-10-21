@@ -1,5 +1,6 @@
 import { toBrlCents } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
+import type { LogRow } from "@/lib/feed";
 import type {
   Category,
   Expense,
@@ -201,6 +202,43 @@ export async function setWeights(projectId: string, weights: Record<string, numb
         .eq("user_id", userId),
     );
   }
+}
+
+// ---------------------------------------------------------------- atividades
+
+/** Últimos lançamentos (despesas e acertos) de todos os projetos, para a tela Atividades. */
+export async function listRecentActivity(limit = 50) {
+  const [log, projects, currencies, profiles] = await Promise.all([
+    supabase
+      .from("activity_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit),
+    supabase.from("projects").select("id, name, emoji"),
+    supabase.from("project_currencies").select("project_id, code, rate"),
+    supabase.from("profiles").select("id, display_name").order("display_name"),
+  ]);
+  const rates: Record<string, Record<string, number>> = {};
+  for (const c of check<any[]>(currencies)) (rates[c.project_id] ??= {})[c.code] = Number(c.rate);
+  return {
+    log: check<any[]>(log).map(
+      (r): LogRow => ({
+        id: Number(r.id),
+        projectId: r.project_id,
+        actor: r.actor,
+        entity: r.entity,
+        entityId: r.entity_id,
+        action: r.action,
+        summary: r.summary,
+        changes: r.changes,
+        createdAt: r.created_at,
+      }),
+    ),
+    projects: new Map(check<any[]>(projects).map((p) => [p.id as string, { name: p.name as string, emoji: p.emoji as string }])),
+    people: check<any[]>(profiles).map((p) => ({ id: p.id as string, name: p.display_name as string })),
+    rates,
+  };
 }
 
 // ---------------------------------------------------------------- moedas
