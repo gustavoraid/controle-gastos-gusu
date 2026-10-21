@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { ErrorBox, Header, Loading, haptic, toast } from "@/components/ui";
+import { DateChips } from "@/components/DateChips";
+import { Avatar, ErrorBox, Header, Loading, PERSON_COLORS, haptic, toast } from "@/components/ui";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
 import { addSettlement, newId } from "@/lib/api";
@@ -33,18 +34,27 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
   const [from, setFrom] = useState(suggestion?.from ?? me);
   const [to, setTo] = useState(suggestion?.to ?? other);
   const [amount, setAmount] = useState(suggestion ? centsToInput(suggestion.amountCents) : "");
+  const [date, setDate] = useState(todayISO());
   const [busy, setBusy] = useState(false);
   const [draftId] = useState(newId);
 
-  const name = (uid: string) => (uid === me ? "Eu" : members.find((m) => m.userId === uid)?.name ?? "?");
+  const member = (uid: string) => members.find((m) => m.userId === uid);
+  const name = (uid: string) => (uid === me ? "Eu" : member(uid)?.name ?? "?");
+  const color = (uid: string) => PERSON_COLORS[Math.max(0, members.findIndex((m) => m.userId === uid)) % PERSON_COLORS.length];
   const cents = parseAmountToCents(amount);
+
+  // São só duas pessoas: inverter troca quem paga e quem recebe.
+  function swap() {
+    setFrom(to);
+    setTo(from);
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!cents || from === to) return;
     setBusy(true);
     try {
-      await addSettlement({ id: draftId, projectId, fromUser: from, toUser: to, amountCents: cents, settledOn: todayISO(), me });
+      await addSettlement({ id: draftId, projectId, fromUser: from, toUser: to, amountCents: cents, settledOn: date, me });
       haptic();
       toast.ok("Pagamento registrado");
       back(`/p/${projectId}`);
@@ -54,6 +64,14 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
     }
   }
 
+  const person = (uid: string, label: string) => (
+    <span className="settle-person">
+      <Avatar name={member(uid)?.name ?? "?"} size={40} color={color(uid)} />
+      <strong>{name(uid)}</strong>
+      <span className="muted small">{label}</span>
+    </span>
+  );
+
   return (
     <>
       <Header title="Acertar contas" onBack={() => back(`/p/${projectId}`)} />
@@ -61,21 +79,12 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
         <p className="muted">Registre um Pix/transferência entre vocês. Isso zera (ou reduz) o saldo.</p>
 
         <div className="settle-flow">
-          <select value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Quem pagou">
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {name(m.userId)}
-              </option>
-            ))}
-          </select>
-          <span className="muted">pagou para</span>
-          <select value={to} onChange={(e) => setTo(e.target.value)} aria-label="Quem recebeu">
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {name(m.userId)}
-              </option>
-            ))}
-          </select>
+          {person(from, "paga")}
+          <button type="button" className="swap-btn" onClick={swap} aria-label="Inverter quem paga e quem recebe">
+            <span aria-hidden="true">→</span>
+            <span className="small">inverter ⇄</span>
+          </button>
+          {person(to, "recebe")}
         </div>
 
         <label className="amount-field">
@@ -85,10 +94,19 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
 
         {suggestion && (
           <p className="muted small">
-            Saldo atual: {name(suggestion.from)} deve {formatBRL(suggestion.amountCents)} a {name(suggestion.to)}.
+            Saldo atual:{" "}
+            {suggestion.to === me
+              ? `${name(suggestion.from)} te deve ${formatBRL(suggestion.amountCents)}.`
+              : suggestion.from === me
+                ? `você deve ${formatBRL(suggestion.amountCents)} a ${name(suggestion.to)}.`
+                : `${name(suggestion.from)} deve ${formatBRL(suggestion.amountCents)} a ${name(suggestion.to)}.`}
           </p>
         )}
-        {from === to && <p className="text-err small">Escolha duas pessoas diferentes.</p>}
+
+        <div className="field">
+          <span>Quando</span>
+          <DateChips value={date} onChange={setDate} />
+        </div>
 
         <div className="sticky-actions">
           <button className="btn primary big" disabled={busy || !cents || from === to}>
