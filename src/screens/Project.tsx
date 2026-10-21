@@ -4,9 +4,9 @@ import { Avatar, ErrorBox, Header, Loading, Money, PERSON_COLORS, toast } from "
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
-import { deleteSettlement, listActivity, setSortKeys } from "@/lib/api";
+import { deleteSettlement, listActivity, listActivityMonths, setSortKeys } from "@/lib/api";
 import { suggestTransfers } from "@/lib/balances";
-import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { dayLabel, monthLabel, monthRange, navigableMonths, shiftMonth, shortDayLabel, stepMonth, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
@@ -27,11 +27,17 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   // Viagem mostra tudo de uma vez (sem navegação por mês); os outros tipos, mês a mês.
   const type = proj.data?.project.type;
   const isTrip = type === "viagem";
+  // Casa: a navegação pula meses sem lançamento e a lista não agrupa por dia (data na linha).
+  const isHome = type === "casa";
   const activity = useLoad(
     () => (type ? listActivity(id, isTrip ? undefined : monthRange(month)) : Promise.resolve(null)),
     [id, month, type],
   );
-  reloadActivity.current = activity.reload;
+  const activeMonths = useLoad(() => (isHome ? listActivityMonths(id) : Promise.resolve(null)), [id, isHome]);
+  reloadActivity.current = () => {
+    activity.reload();
+    activeMonths.reload();
+  };
 
   useEffect(() => setLastProject(id), [id]);
 
@@ -56,6 +62,9 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   if (!data) return <Loading />;
 
   const { project, members, balances } = data;
+  const months = activeMonths.data ? navigableMonths(activeMonths.data, todayISO().slice(0, 7)) : null;
+  const prevMonth = months ? stepMonth(months, month, -1) : shiftMonth(month, -1);
+  const nextMonth = months ? stepMonth(months, month, 1) : shiftMonth(month, 1);
   const settingsBtn = (
     <button className="icon-btn" aria-label="Ajustes do projeto" onClick={() => go(`/p/${id}/config`)}>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -73,11 +82,11 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
 
         {!isTrip && (
         <nav className="month-nav">
-          <button className="icon-btn" aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
+          <button className="icon-btn" aria-label="Mês anterior" disabled={!prevMonth} onClick={() => prevMonth && setMonth(prevMonth)}>
             ‹
           </button>
           <strong>{monthLabel(month)}</strong>
-          <button className="icon-btn" aria-label="Próximo mês" onClick={() => setMonth(shiftMonth(month, 1))}>
+          <button className="icon-btn" aria-label="Próximo mês" disabled={!nextMonth} onClick={() => nextMonth && setMonth(nextMonth)}>
             ›
           </button>
         </nav>
@@ -118,10 +127,11 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             expenses={activity.data.expenses}
             settlements={activity.data.settlements}
             emptyText={isTrip ? "Nada lançado nesta viagem ainda." : "Nada lançado neste mês."}
+            groupByDay={!isHome}
             reordering={reordering}
             onExitReorder={() => setReordering(false)}
             onChanged={() => {
-              activity.reload();
+              reloadActivity.current?.();
               proj.reload();
             }}
           />
@@ -220,6 +230,8 @@ function ActivityList(props: {
   expenses: Expense[];
   settlements: Settlement[];
   emptyText: string;
+  /** false: lista corrida, com a data em cada linha (o modo reordenar continua por dia). */
+  groupByDay: boolean;
   reordering: boolean;
   onExitReorder: () => void;
   onChanged: () => void;
@@ -335,34 +347,43 @@ function ActivityList(props: {
     );
   }
 
+  const day = (date: string) => (props.groupByDay ? undefined : shortDayLabel(date));
+  const renderItem = (it: Item) =>
+    it.kind === "e" ? (
+      <ExpenseRow key={it.e.id} e={it.e} me={me} names={names} color={props.colors.get(it.e.paidBy)} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} day={day(it.date)} />
+    ) : (
+      <li key={it.s.id}>
+        <button className="list-item compact" onClick={() => removeSettlement(it.s)}>
+          <span className="cat-badge sm settle">💸</span>
+          <span className="grow min0">
+            <strong className="ellipsis">Acerto de contas</strong>
+            <span className="payer small">
+              <Avatar name={names.get(it.s.fromUser) ?? "?"} size={16} color={props.colors.get(it.s.fromUser)} />
+              {it.s.fromUser === me ? "Você" : names.get(it.s.fromUser)} → {it.s.toUser === me ? "você" : names.get(it.s.toUser)}
+              {day(it.date) && <> · {day(it.date)}</>}
+            </span>
+          </span>
+          <span className="amount-col">
+            <Money cents={it.s.amountCents} />
+          </span>
+        </button>
+      </li>
+    );
+
+  if (!props.groupByDay) {
+    return (
+      <div className="activity">
+        <ul className="list">{items.map(renderItem)}</ul>
+      </div>
+    );
+  }
+
   return (
     <div className="activity">
       {groups.map((g) => (
         <section key={g.date}>
           <h2 className="day-label">{dayLabel(g.date)}</h2>
-          <ul className="list">
-            {g.items.map((it) =>
-              it.kind === "e" ? (
-                <ExpenseRow key={it.e.id} e={it.e} me={me} names={names} color={props.colors.get(it.e.paidBy)} cat={it.e.categoryId ? cats.get(it.e.categoryId) : undefined} projectId={props.projectId} />
-              ) : (
-                <li key={it.s.id}>
-                  <button className="list-item compact" onClick={() => removeSettlement(it.s)}>
-                    <span className="cat-badge sm settle">💸</span>
-                    <span className="grow min0">
-                      <strong className="ellipsis">Acerto de contas</strong>
-                      <span className="payer small">
-                        <Avatar name={names.get(it.s.fromUser) ?? "?"} size={16} color={props.colors.get(it.s.fromUser)} />
-                        {it.s.fromUser === me ? "Você" : names.get(it.s.fromUser)} → {it.s.toUser === me ? "você" : names.get(it.s.toUser)}
-                      </span>
-                    </span>
-                    <span className="amount-col">
-                      <Money cents={it.s.amountCents} />
-                    </span>
-                  </button>
-                </li>
-              ),
-            )}
-          </ul>
+          <ul className="list">{g.items.map(renderItem)}</ul>
         </section>
       ))}
     </div>
@@ -376,6 +397,8 @@ function ExpenseRow(props: {
   color?: string;
   cat?: Category;
   projectId: string;
+  /** Data na própria linha (lista sem agrupamento por dia). */
+  day?: string;
   /** Alça de arrastar: quando presente, a linha está no modo "Reordenar" (sem abrir a despesa). */
   handle?: ReactNode;
 }) {
@@ -391,6 +414,7 @@ function ExpenseRow(props: {
           <span className="payer small">
             <Avatar name={payerName} size={16} color={props.color} />
             {e.paidBy === me ? "Você" : payerName}
+            {props.day && <> · {props.day}</>}
           </span>
         </span>
         <span className="amount-col">
