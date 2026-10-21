@@ -974,3 +974,13 @@ li.dragging {
   border-radius: 50%;
   background: var(--brand);
 }
+.feed-changes {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  opacity: 0.8;
+}
+.amount-col.struck .money {
+  text-decoration: line-through;
+  opacity: 0.6;
+}

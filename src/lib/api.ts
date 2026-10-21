@@ -1,5 +1,6 @@
 import { toBrlCents } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
+import type { LogRow } from "@/lib/feed";
 import type {
   Category,
   Expense,
@@ -207,16 +208,12 @@ export async function setWeights(projectId: string, weights: Record<string, numb
 
 /** Últimos lançamentos (despesas e acertos) de todos os projetos, para a tela Atividades. */
 export async function listRecentActivity(limit = 50) {
-  const [exp, set, projects, currencies, profiles] = await Promise.all([
+  const [log, projects, currencies, profiles] = await Promise.all([
     supabase
-      .from("expenses")
-      .select("id, project_id, description, amount, currency, paid_by, created_by, created_at")
+      .from("activity_log")
+      .select("*")
       .order("created_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("settlements")
-      .select("id, project_id, from_user, to_user, amount_cents, created_by, created_at")
-      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit),
     supabase.from("projects").select("id, name, emoji"),
     supabase.from("project_currencies").select("project_id, code, rate"),
@@ -225,25 +222,19 @@ export async function listRecentActivity(limit = 50) {
   const rates: Record<string, Record<string, number>> = {};
   for (const c of check<any[]>(currencies)) (rates[c.project_id] ??= {})[c.code] = Number(c.rate);
   return {
-    expenses: check<any[]>(exp).map((e) => ({
-      id: e.id as string,
-      projectId: e.project_id as string,
-      description: e.description as string,
-      amount: Number(e.amount),
-      currency: e.currency as string,
-      paidBy: e.paid_by as string,
-      createdBy: e.created_by as string,
-      createdAt: e.created_at as string,
-    })),
-    settlements: check<any[]>(set).map((t) => ({
-      id: t.id as string,
-      projectId: t.project_id as string,
-      fromUser: t.from_user as string,
-      toUser: t.to_user as string,
-      amountCents: Number(t.amount_cents),
-      createdBy: t.created_by as string,
-      createdAt: t.created_at as string,
-    })),
+    log: check<any[]>(log).map(
+      (r): LogRow => ({
+        id: Number(r.id),
+        projectId: r.project_id,
+        actor: r.actor,
+        entity: r.entity,
+        entityId: r.entity_id,
+        action: r.action,
+        summary: r.summary,
+        changes: r.changes,
+        createdAt: r.created_at,
+      }),
+    ),
     projects: new Map(check<any[]>(projects).map((p) => [p.id as string, { name: p.name as string, emoji: p.emoji as string }])),
     people: check<any[]>(profiles).map((p) => ({ id: p.id as string, name: p.display_name as string })),
     rates,

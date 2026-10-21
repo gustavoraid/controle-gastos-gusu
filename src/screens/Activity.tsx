@@ -5,7 +5,7 @@ import { back, go } from "@/hooks/useRoute";
 import { listRecentActivity } from "@/lib/api";
 import { formatMoney } from "@/lib/currency";
 import { dayLabel } from "@/lib/dates";
-import { buildFeed, feedDay, feedTitle, isUnseen, type FeedItem } from "@/lib/feed";
+import { buildFeed, feedChanges, feedDay, feedTitle, isUnseen, type FeedItem } from "@/lib/feed";
 import { formatBRL } from "@/lib/money";
 import { getFeedSeen, setFeedSeen } from "@/lib/storage";
 
@@ -34,7 +34,7 @@ export function Activity({ me }: { me: string }) {
 
 function Feed(props: { me: string; data: Awaited<ReturnType<typeof listRecentActivity>>; lastSeen: number | null }) {
   const { me, data } = props;
-  const items = buildFeed(data.expenses, data.settlements, data.rates, 50);
+  const items = buildFeed(data.log, data.rates, 50);
   const nameOf = new Map(data.people.map((p) => [p.id, p.name]));
   const colorOf = new Map(data.people.map((p, i) => [p.id, PERSON_COLORS[i % PERSON_COLORS.length]]));
   const name = (uid: string) => nameOf.get(uid) ?? "?";
@@ -58,7 +58,7 @@ function Feed(props: { me: string; data: Awaited<ReturnType<typeof listRecentAct
 
   return (
     <div className="activity">
-      <p className="muted small">Últimos 50 lançamentos de todos os projetos, na ordem em que foram feitos.</p>
+      <p className="muted small">Últimas 50 ações (lançar, editar, apagar) de todos os projetos, na ordem em que foram feitas.</p>
       {groups.map((g) => (
         <section key={g.day}>
           <h2 className="day-label">{dayLabel(g.day)}</h2>
@@ -66,26 +66,31 @@ function Feed(props: { me: string; data: Awaited<ReturnType<typeof listRecentAct
             {g.items.map((it) => {
               const project = data.projects.get(it.projectId);
               const unseen = isUnseen(it, me, props.lastSeen);
-              const open = () => go(it.kind === "expense" ? `/p/${it.projectId}/add?e=${it.id}` : `/p/${it.projectId}`);
+              const open = () =>
+                go(it.entity === "expense" && !it.gone ? `/p/${it.projectId}/add?e=${it.entityId}` : `/p/${it.projectId}`);
+              const changes = feedChanges(it, me, name);
+              const s = it.summary;
               return (
-                <li key={it.kind + it.id}>
+                <li key={it.id}>
                   <button className={`list-item compact feed-item ${unseen ? "unseen" : ""}`} onClick={open}>
-                    <Avatar name={name(it.actor)} size={30} color={colorOf.get(it.actor)} />
+                    <Avatar name={it.actor ? name(it.actor) : "?"} size={30} color={it.actor ? colorOf.get(it.actor) : undefined} />
                     <span className="grow min0">
                       <strong className="feed-title">{feedTitle(it, me, name)}</strong>
                       <span className="muted small ellipsis">
                         {project ? `${project.emoji} ${project.name}` : "Projeto"} · {timeFmt.format(new Date(it.createdAt))}
-                        {it.kind === "expense" && it.paidBy !== it.actor && ` · pago por ${it.paidBy === me ? "você" : name(it.paidBy)}`}
+                        {it.entity === "expense" && it.action === "created" && s.paid_by !== it.actor &&
+                          ` · pago por ${s.paid_by === me ? "você" : name(s.paid_by)}`}
                       </span>
+                      {changes.length > 0 && <span className="feed-changes small">{changes.join(" · ")}</span>}
                     </span>
-                    <span className="amount-col">
-                      {it.kind === "expense" ? (
+                    <span className={`amount-col ${it.action === "deleted" ? "struck" : ""}`}>
+                      {it.entity === "expense" ? (
                         <>
-                          <span className="money">{formatMoney(it.amount, it.currency)}</span>
-                          {it.currency !== "BRL" && <span className="muted small">≈ {formatBRL(it.brlCents)}</span>}
+                          <span className="money">{formatMoney(Number(s.amount), s.currency)}</span>
+                          {s.currency !== "BRL" && <span className="muted small">≈ {formatBRL(it.brlCents)}</span>}
                         </>
                       ) : (
-                        <span className="money">{formatBRL(it.amountCents)}</span>
+                        <span className="money">{formatBRL(it.brlCents)}</span>
                       )}
                     </span>
                     {unseen && <span className="unseen-dot" aria-label="Novo" />}

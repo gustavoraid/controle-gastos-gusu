@@ -25,6 +25,7 @@ alter table public.activity_log enable row level security;
 
 -- Só leitura pelo app; quem escreve é o gatilho abaixo.
 create policy activity_select on public.activity_log for select using (is_project_member(project_id));
+revoke all on public.activity_log from anon, authenticated;
 grant select on public.activity_log to authenticated;
 
 create or replace function public.log_activity ()
