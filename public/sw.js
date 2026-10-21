@@ -1,9 +1,10 @@
 // Service worker mínimo: deixa o app abrir rápido (e sem internet) guardando
 // o "esqueleto" (HTML/JS/CSS/ícones). Dados do Supabase nunca são cacheados.
-const CACHE = "gastos-v2"; // trocar a versão força os celulares a buscar o manifesto novo
+const CACHE = "gastos-v3"; // trocar a versão força os celulares a buscar o manifesto novo
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./", "./manifest.webmanifest", "./icons/icon.svg"])));
+  const shell = ["./", "./manifest.webmanifest", "./icons/icon.svg"].map((u) => new Request(u, { cache: "reload" }));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(shell)));
   self.skipWaiting();
 });
 
@@ -22,9 +23,11 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
 
   // Páginas: rede primeiro (pega versão nova), cache se estiver offline.
+  // "no-cache" pula o cache HTTP do navegador: o GitHub Pages manda o HTML com
+  // max-age=600, e sem isso o app abria a versão anterior por até 10 min após o deploy.
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put("./", copy));
