@@ -464,7 +464,7 @@ function MonthSummary(props: {
           </span>
         )}
         {props.isTrip && !tripDays && (
-          <button type="button" className="btn link small" onClick={props.onSettings}>
+          <button type="button" className="btn link small trip-days-hint" onClick={props.onSettings}>
             Informe os dias da viagem nos ajustes para ver o gasto por dia
           </button>
         )}
@@ -514,9 +514,9 @@ function MonthSummary(props: {
                   </span>
                   <span>
                     {formatBRL(cents)} <span className="muted">· {Math.round((cents / total) * 100)}%</span>
-                    {tripDays && <span className="muted"> · {formatBRL(perDayCents(cents, tripDays))}/dia</span>}
                   </span>
                 </div>
+                {tripDays && <div className="muted small per-day-cat">{formatBRL(perDayCents(cents, tripDays))} por dia</div>}
                 <div className="bar">
                   <span style={{ width: `${(cents / max) * 100}%` }} />
                 </div>
