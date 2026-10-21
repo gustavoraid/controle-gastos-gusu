@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { DateChips } from "@/components/DateChips";
 import { Chip, ErrorBox, Header, Loading, haptic, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
 import { deleteExpense, getExpense, newId, saveExpense } from "@/lib/api";
-import { addDaysISO, todayISO } from "@/lib/dates";
+import { todayISO } from "@/lib/dates";
 import { currencyDecimals, formatMoney, minorToInput, parseAmountMinor, toBrlCents } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import type { Category, Expense, Member, ProjectCurrency } from "@/lib/types";
@@ -77,11 +78,7 @@ function Form(props: {
   const foreign = currency !== "BRL";
   const desc = description.trim();
   const category = categories.find((c) => c.id === categoryId);
-  const today = todayISO();
-  const yesterday = addDaysISO(today, -1);
-  const dayBefore = addDaysISO(today, -2);
 
-  const otherDate = ![today, yesterday, dayBefore].includes(date);
   // Conversão em texto pequeno logo abaixo do valor (só em moeda estrangeira).
   const info: string[] = [];
   if (foreign) {
@@ -242,22 +239,7 @@ function Form(props: {
 
         <div className="field">
           <span>Quando</span>
-          <div className="chips" role="group" aria-label="Data">
-          <Chip active={date === today} onClick={() => setDate(today)}>
-            Hoje
-          </Chip>
-          <Chip active={date === yesterday} onClick={() => setDate(yesterday)}>
-            Ontem
-          </Chip>
-          <Chip active={date === dayBefore} onClick={() => setDate(dayBefore)}>
-            Anteontem
-          </Chip>
-          {/* input de data invisível por cima do chip: tocar abre o calendário nativo */}
-          <label className={`chip date-pick ${otherDate ? "active" : ""}`}>
-            📅 {otherDate ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : "Outra"}
-            <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Outra data" />
-          </label>
-          </div>
+          <DateChips value={date} onChange={setDate} />
         </div>
 
         <div className="sticky-actions">
