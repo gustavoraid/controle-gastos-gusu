@@ -10,6 +10,7 @@ import { dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/da
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
+import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
 import { setLastProject } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
@@ -135,7 +136,14 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
               label={isTrip ? "Saldo da viagem" : "Saldo geral"}
               onSettle={() => go(`/p/${id}/acertar`)}
             />
-            <MonthSummary members={members} cats={cats} expenses={activity.data.expenses} isTrip={isTrip} />
+            <MonthSummary
+              members={members}
+              cats={cats}
+              expenses={activity.data.expenses}
+              isTrip={isTrip}
+              tripDays={isTrip ? project.tripDays : null}
+              onSettings={() => go(`/p/${id}/config`)}
+            />
           </>
         )}
       </main>
@@ -403,8 +411,15 @@ function ExpenseRow(props: {
   );
 }
 
-function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; expenses: Expense[]; isTrip: boolean }) {
-  const { members, cats, expenses } = props;
+function MonthSummary(props: {
+  members: Member[];
+  cats: Map<string, Category>;
+  expenses: Expense[];
+  isTrip: boolean;
+  tripDays: number | null;
+  onSettings: () => void;
+}) {
+  const { members, cats, expenses, tripDays } = props;
   const total = expenses.reduce((acc, e) => acc + e.amountCents, 0);
 
   if (expenses.length === 0) {
@@ -443,6 +458,16 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
         <span className="muted">{props.isTrip ? "Total da viagem" : "Total gasto no mês"}</span>
         <span className="money big">{formatBRL(total)}</span>
         <span className="muted small">{expenses.length} despesa{expenses.length > 1 ? "s" : ""}</span>
+        {tripDays && (
+          <span className="per-day">
+            <strong>{formatBRL(perDayCents(total, tripDays))}</strong> por dia · {tripDays} dia{tripDays > 1 ? "s" : ""}
+          </span>
+        )}
+        {props.isTrip && !tripDays && (
+          <button type="button" className="btn link small" onClick={props.onSettings}>
+            Informe os dias da viagem nos ajustes para ver o gasto por dia
+          </button>
+        )}
         {foreignTotals.length > 0 && (
           <span className="muted small">
             Inclui {foreignTotals.map(([code, amt]) => formatMoney(amt, code)).join(" e ")} convertidos pela cotação do projeto
@@ -489,6 +514,7 @@ function MonthSummary(props: { members: Member[]; cats: Map<string, Category>; e
                   </span>
                   <span>
                     {formatBRL(cents)} <span className="muted">· {Math.round((cents / total) * 100)}%</span>
+                    {tripDays && <span className="muted"> · {formatBRL(perDayCents(cents, tripDays))}/dia</span>}
                   </span>
                 </div>
                 <div className="bar">

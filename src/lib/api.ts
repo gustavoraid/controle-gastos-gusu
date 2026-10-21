@@ -49,6 +49,7 @@ const mapProject = (r: any): Project => ({
   emoji: r.emoji,
   type: r.type,
   defaultCurrency: r.default_currency,
+  tripDays: r.trip_days ?? null,
   createdBy: r.created_by,
   archived: r.archived,
 });
@@ -183,7 +184,14 @@ export async function createProject(name: string, emoji: string, type: ProjectTy
 
 export async function updateProject(
   id: string,
-  patch: { name?: string; emoji?: string; type?: ProjectType; default_currency?: string; archived?: boolean },
+  patch: {
+    name?: string;
+    emoji?: string;
+    type?: ProjectType;
+    trip_days?: number | null;
+    default_currency?: string;
+    archived?: boolean;
+  },
 ) {
   check(await supabase.from("projects").update(patch).eq("id", id));
 }

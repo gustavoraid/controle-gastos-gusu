@@ -18,6 +18,8 @@ export interface Project {
   emoji: string;
   type: ProjectType;
   defaultCurrency: string;
+  /** Duração da viagem em dias (só viagem; null = não informado). */
+  tripDays: number | null;
   createdBy: string;
   archived: boolean;
 }
