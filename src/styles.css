@@ -1025,3 +1025,22 @@ li.dragging {
   text-align: center;
   box-shadow: 0 0 0 2px var(--bg);
 }
+.block {
+  display: block;
+}
+.days-input {
+  width: 5rem !important;
+  text-align: right;
+}
+.per-day {
+  margin-top: 4px;
+  font-size: 15px;
+}
+.per-day-cat {
+  text-align: right;
+  margin-top: -2px;
+}
+.btn.link.trip-days-hint {
+  padding: 4px 0;
+  text-align: left;
+}
