@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFeed, feedChanges, feedDay, feedTitle, isUnseen, type LogRow } from "./feed";
+import { badgeLabel, buildFeed, feedChanges, feedDay, feedTitle, isUnseen, type LogRow } from "./feed";
 
 const G = "g", S = "s";
 const name = (uid: string) => (uid === G ? "Gustavo" : "Suellen");
@@ -114,5 +114,11 @@ describe("feedDay e isUnseen", () => {
     expect(isUnseen(exp(at, G), G, before)).toBe(false);
     expect(isUnseen(exp(at, S), G, Date.parse(at))).toBe(false);
     expect(isUnseen(exp(at, S), G, null)).toBe(false);
+  });
+});
+
+describe("badgeLabel", () => {
+  it("zero não mostra nada; dez ou mais vira 9+", () => {
+    expect([0, 1, 9, 10, 42].map(badgeLabel)).toEqual(["", "1", "9", "9+", "9+"]);
   });
 });
