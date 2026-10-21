@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { addDaysISO, dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from "./dates";
+import {
+  addDaysISO,
+  dayLabel,
+  monthLabel,
+  monthRange,
+  navigableMonths,
+  shiftMonth,
+  shortDayLabel,
+  stepMonth,
+  todayISO,
+} from "./dates";
 
 describe("datas", () => {
   it("hoje usa o fuso do aparelho, não UTC", () => {
@@ -27,5 +37,28 @@ describe("datas", () => {
     expect(monthLabel("2026-10")).toBe("Outubro de 2026");
     expect(dayLabel("2026-10-10", "2026-10-10")).toBe("Hoje");
     expect(dayLabel("2026-10-09", "2026-10-10")).toBe("Ontem");
+  });
+  it("meses navegáveis: só os com lançamento, mais o corrente", () => {
+    expect(navigableMonths(["2026-10", "2023-08", "2026-10", "2026-11"], "2026-10")).toEqual([
+      "2023-08",
+      "2026-10",
+      "2026-11",
+    ]);
+    expect(navigableMonths([], "2026-10")).toEqual(["2026-10"]);
+  });
+  it("navegação pula meses vazios", () => {
+    const meses = ["2023-08", "2023-10", "2026-10"];
+    expect(stepMonth(meses, "2026-10", -1)).toBe("2023-10");
+    expect(stepMonth(meses, "2023-10", -1)).toBe("2023-08");
+    expect(stepMonth(meses, "2023-08", -1)).toBeNull();
+    expect(stepMonth(meses, "2023-08", 1)).toBe("2023-10");
+    expect(stepMonth(meses, "2026-10", 1)).toBeNull();
+    // mês atual fora da lista (lançamento apagado): ainda acha os vizinhos
+    expect(stepMonth(meses, "2024-05", 1)).toBe("2026-10");
+  });
+  it("data curta na linha", () => {
+    expect(shortDayLabel("2026-10-10", "2026-10-10")).toBe("Hoje");
+    expect(shortDayLabel("2026-10-09", "2026-10-10")).toBe("Ontem");
+    expect(shortDayLabel("2026-10-03", "2026-10-10")).toBe("sáb., 03");
   });
 });

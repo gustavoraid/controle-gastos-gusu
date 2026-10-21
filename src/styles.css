@@ -520,6 +520,12 @@ select:focus {
   align-items: center;
   justify-content: space-between;
 }
+/* sem mês com lançamento para esse lado */
+.month-nav .icon-btn:disabled {
+  opacity: 0.25;
+  background: transparent;
+  cursor: default;
+}
 
 .empty {
   text-align: center;

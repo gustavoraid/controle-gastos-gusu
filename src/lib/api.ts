@@ -268,6 +268,18 @@ export async function listActivity(projectId: string, range?: { start: string; e
   return { expenses: expenses.map((e) => mapExpense(e, rates)), settlements: settlements.map(mapSettlement) };
 }
 
+/** Meses ("YYYY-MM") com alguma despesa ou acerto no projeto. */
+export async function listActivityMonths(projectId: string): Promise<string[]> {
+  const expenses = await fetchAll<any>((from, to) =>
+    supabase.from("expenses").select("spent_on").eq("project_id", projectId).order("id").range(from, to),
+  );
+  const settlements = await fetchAll<any>((from, to) =>
+    supabase.from("settlements").select("settled_on").eq("project_id", projectId).order("id").range(from, to),
+  );
+  const days = [...expenses.map((e) => e.spent_on as string), ...settlements.map((s) => s.settled_on as string)];
+  return [...new Set(days.map((d) => d.slice(0, 7)))].sort();
+}
+
 export async function getExpense(id: string): Promise<Expense> {
   const r = check<any>(await supabase.from("expenses").select("*").eq("id", id).single());
   return mapExpense(r, await getRates(r.project_id));
