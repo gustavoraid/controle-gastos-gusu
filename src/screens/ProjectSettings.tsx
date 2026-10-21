@@ -34,6 +34,7 @@ import {
 import { formatBRL } from "@/lib/money";
 import { moveItem } from "@/lib/order";
 import { parseWeight, percentLabels } from "@/lib/split";
+import { parseTripDays } from "@/lib/trip";
 import {
   PROJECT_TYPES,
   type Category,
@@ -62,7 +63,7 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
     <>
       <Header title="Ajustes do projeto" onBack={() => back(`/p/${projectId}`)} />
       <main className="page stack">
-        <ProjectInfo key={project.id + project.name + project.emoji + project.type} project={project} />
+        <ProjectInfo key={[project.id, project.name, project.emoji, project.type, project.tripDays].join()} project={project} />
         <Proportions
           key={members.map((m) => m.userId + m.weight).join()}
           projectId={projectId}
@@ -90,11 +91,16 @@ function ProjectInfo({ project }: { project: Project }) {
   const [name, setName] = useState(project.name);
   const [emoji, setEmoji] = useState(project.emoji);
   const [type, setType] = useState<ProjectType>(project.type);
-  const dirty = name.trim() !== project.name || emoji !== project.emoji || type !== project.type;
+  const [days, setDays] = useState(project.tripDays ? String(project.tripDays) : "");
+  // Dias só valem para viagem; vazio apaga.
+  const tripDays = type === "viagem" ? parseTripDays(days) : project.tripDays;
+  const daysInvalid = type === "viagem" && days.trim() !== "" && tripDays === null;
+  const dirty =
+    name.trim() !== project.name || emoji !== project.emoji || type !== project.type || tripDays !== project.tripDays;
 
   async function save() {
     try {
-      await updateProject(project.id, { name: name.trim(), emoji, type });
+      await updateProject(project.id, { name: name.trim(), emoji, type, trip_days: tripDays });
       toast.ok("Projeto atualizado");
     } catch (err) {
       toast.err((err as Error).message);
@@ -113,8 +119,26 @@ function ProjectInfo({ project }: { project: Project }) {
           </button>
         ))}
       </div>
+      {type === "viagem" && (
+        <label className="row between gap-sm">
+          <span>
+            Dias de viagem
+            <span className="muted small block">Para o Resumo mostrar o gasto por dia</span>
+          </span>
+          <input
+            className="days-input"
+            value={days}
+            onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            placeholder="—"
+            maxLength={3}
+            aria-label="Dias de viagem"
+          />
+        </label>
+      )}
+      {daysInvalid && <p className="text-err small">Informe de 1 a 366 dias.</p>}
       {dirty && (
-        <button className="btn primary" onClick={save} disabled={!name.trim()}>
+        <button className="btn primary" onClick={save} disabled={!name.trim() || daysInvalid}>
           Salvar
         </button>
       )}

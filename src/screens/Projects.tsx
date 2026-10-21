@@ -1,13 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, ErrorBox, Header, Loading, Money } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { go } from "@/hooks/useRoute";
-import { listProjects, signOut } from "@/lib/api";
+import { countUnseenActivity, listProjects, signOut } from "@/lib/api";
+import { badgeLabel } from "@/lib/feed";
+import { getFeedSeen } from "@/lib/storage";
 import type { ProjectSummary } from "@/lib/types";
 
 export function Projects({ me }: { me: string }) {
   const { data, error, reload } = useLoad(() => listProjects(me), [me]);
   const [showArchived, setShowArchived] = useState(false);
+  const unseen = useLoad(() => countUnseenActivity(me, getFeedSeen()), [me]);
+  // Voltou para o app (estava em segundo plano): atualiza o contador do sino.
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === "visible" && unseen.reload();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [unseen.reload]);
+  const badge = badgeLabel(unseen.data ?? 0);
 
   const menu = (
     <button
@@ -29,7 +39,22 @@ export function Projects({ me }: { me: string }) {
 
   return (
     <>
-      <Header title="Gastos GuSu" action={menu} />
+      <Header
+        title="Gastos GuSu"
+        left={
+          <button
+            className="icon-btn bell"
+            aria-label={badge ? `Atividades recentes, ${badge} novas` : "Atividades recentes"}
+            onClick={() => go("/atividades")}
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 21h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {badge && <span className="bell-badge">{badge}</span>}
+          </button>
+        }
+        action={menu}
+      />
       <main className="page">
         {error && <ErrorBox message={error} onRetry={reload} />}
         {!data && !error && <Loading />}
