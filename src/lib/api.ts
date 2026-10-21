@@ -207,6 +207,19 @@ export async function setWeights(projectId: string, weights: Record<string, numb
 // ---------------------------------------------------------------- atividades
 
 /** Últimos lançamentos (despesas e acertos) de todos os projetos, para a tela Atividades. */
+/** Ações da outra pessoa desde a última visita à tela Atividades (só a contagem). */
+export async function countUnseenActivity(me: string, since: number | null): Promise<number> {
+  // Aparelho que nunca abriu Atividades não tem referência: a tela também não marca nada como novo.
+  if (since === null) return 0;
+  const { count, error } = await supabase
+    .from("activity_log")
+    .select("id", { count: "exact", head: true })
+    .neq("actor", me)
+    .gt("created_at", new Date(since).toISOString());
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export async function listRecentActivity(limit = 50) {
   const [log, projects, currencies, profiles] = await Promise.all([
     supabase

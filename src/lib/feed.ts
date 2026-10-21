@@ -88,3 +88,9 @@ export function feedChanges(item: LogRow, me: string, name: (uid: string) => str
 export function isUnseen(item: LogRow, me: string, lastSeen: number | null): boolean {
   return item.actor !== me && lastSeen !== null && Date.parse(item.createdAt) > lastSeen;
 }
+
+/** Texto do contador no sino: nada quando zero, "9+" a partir de dez. */
+export function badgeLabel(count: number): string {
+  if (count <= 0) return "";
+  return count > 9 ? "9+" : String(count);
+}
