@@ -38,3 +38,25 @@ export function setFeedSeen(ms: number) {
     /* ignora */
   }
 }
+
+const VIEW_MONTH = "gc:mesNaTela:";
+
+/**
+ * Mês que a tela do projeto está mostrando (só nesta sessão do app): voltar de
+ * uma despesa não pula para o mês atual, e salvar uma despesa abre o mês dela.
+ */
+export function getViewMonth(projectId: string): string | null {
+  try {
+    return sessionStorage.getItem(VIEW_MONTH + projectId);
+  } catch {
+    return null;
+  }
+}
+
+export function setViewMonth(projectId: string, month: string) {
+  try {
+    sessionStorage.setItem(VIEW_MONTH + projectId, month);
+  } catch {
+    /* ignora */
+  }
+}

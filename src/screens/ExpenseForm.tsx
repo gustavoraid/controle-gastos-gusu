@@ -8,6 +8,7 @@ import { deleteExpense, getExpense, newId, saveExpense } from "@/lib/api";
 import { todayISO } from "@/lib/dates";
 import { currencyDecimals, formatMoney, minorToInput, parseAmountMinor, toBrlCents } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
+import { setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, ProjectCurrency } from "@/lib/types";
 
 export function ExpenseForm({ projectId, expenseId, me }: { projectId: string; expenseId: string | null; me: string }) {
@@ -119,6 +120,8 @@ function Form(props: {
       });
       haptic();
       toast.ok(existing ? "Despesa atualizada" : `${formatMoney(minor, currency)} lançado`);
+      // A tela do projeto abre no mês da despesa (não no mês atual).
+      setViewMonth(projectId, date.slice(0, 7));
       back(`/p/${projectId}`);
     } catch (err) {
       toast.err((err as Error).message);
