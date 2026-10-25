@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { Loading, ToastHost } from "@/components/ui";
 import { useSession } from "@/hooks/useSession";
 import { go, useRoute } from "@/hooks/useRoute";
+import { listProjects } from "@/lib/api";
+import { pickHomeProject } from "@/lib/launch";
 import { supabaseConfigured } from "@/lib/supabase";
 import { getLastProject } from "@/lib/storage";
 import { ExpenseForm } from "@/screens/ExpenseForm";
@@ -26,13 +28,23 @@ function Routes() {
   const { session, ready } = useSession();
   const { parts, params } = useRoute();
 
-  // Atalho "Nova despesa" do ícone (manifest shortcuts) → último projeto aberto.
+  // Atalhos de "nova despesa": #/add/casa → primeiro projeto Casa (ícone próprio na
+  // tela inicial); #/add → último projeto aberto.
   useEffect(() => {
-    if (session && parts[0] === "add") {
-      const last = getLastProject();
-      go(last ? `/p/${last}/add` : "/", { replace: true });
+    if (!session || parts[0] !== "add") return;
+    if (parts[1] === "casa") {
+      listProjects(session.user.id).then(
+        (ps) => {
+          const casa = pickHomeProject(ps);
+          go(casa ? `/p/${casa.id}/add` : "/", { replace: true });
+        },
+        () => go("/", { replace: true }),
+      );
+      return;
     }
-  }, [session, parts]);
+    const last = getLastProject();
+    go(last ? `/p/${last}/add` : "/", { replace: true });
+  }, [session, parts[0], parts[1]]);
 
   if (!supabaseConfigured) {
     return (

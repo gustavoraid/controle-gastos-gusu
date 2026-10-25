@@ -1,6 +1,6 @@
 // Service worker mínimo: deixa o app abrir rápido (e sem internet) guardando
 // o "esqueleto" (HTML/JS/CSS/ícones). Dados do Supabase nunca são cacheados.
-const CACHE = "gastos-v3"; // trocar a versão força os celulares a buscar o manifesto novo
+const CACHE = "gastos-v4"; // trocar a versão força os celulares a buscar o manifesto novo
 
 self.addEventListener("install", (e) => {
   const shell = ["./", "./manifest.webmanifest", "./icons/icon.svg"].map((u) => new Request(u, { cache: "reload" }));
@@ -29,11 +29,12 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
         .then((res) => {
+          // Cada página no seu endereço (index e nova-despesa.html têm manifestos diferentes).
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("./", copy));
+          caches.open(CACHE).then((c) => c.put(url.pathname, copy));
           return res;
         })
-        .catch(() => caches.match("./")),
+        .catch(() => caches.match(url.pathname).then((hit) => hit || caches.match("./"))),
     );
     return;
   }
