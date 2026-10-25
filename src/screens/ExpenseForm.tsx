@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DateChips } from "@/components/DateChips";
-import { Avatar, Chip, ErrorBox, Header, Loading, PERSON_COLORS, haptic, toast } from "@/components/ui";
+import { Chip, ErrorBox, Header, Loading, PERSON_COLORS, haptic, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
@@ -194,9 +194,9 @@ function Form(props: {
               aria-label={`Pago por ${payer?.userId === me ? "mim" : payer?.name}. Toque para trocar`}
             >
               <span className="muted small">pago por ⇄</span>
-              <span className="payer-name">
-                <Avatar name={payer?.name ?? "?"} size={22} color={PERSON_COLORS[Math.max(0, payerIndex) % PERSON_COLORS.length]} />
-                <span className="who">{payer?.userId === me ? "Eu" : payer?.name}</span>
+              {/* Só as duas primeiras letras (Gu / Su), na cor da pessoa. */}
+              <span className="payer-chip" style={{ background: PERSON_COLORS[Math.max(0, payerIndex) % PERSON_COLORS.length] }}>
+                {(payer?.name ?? "?").slice(0, 2)}
               </span>
             </button>
           )}

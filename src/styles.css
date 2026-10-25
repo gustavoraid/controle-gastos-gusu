@@ -1096,17 +1096,16 @@ li.dragging {
   justify-content: flex-start;
 }
 .expense-form.compact .amount-row .amount-field input {
-  font-size: 36px !important;
+  font-size: 40px !important;
   width: 100% !important;
   min-width: 0;
 }
 .payer-toggle {
   flex: none;
-  width: 116px; /* fixo: alternar entre "Eu" e "Suellen" não mexe no espaço do valor */
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   padding: 6px 10px 8px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1118,19 +1117,15 @@ li.dragging {
 .payer-toggle:active {
   background: var(--surface-2);
 }
-.payer-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  font-size: 15px;
-  font-weight: 650;
-}
-.payer-name .who {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.payer-chip {
+  min-width: 52px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+  text-align: center;
+  line-height: 1.2;
 }
 .expense-form.compact .conversion {
   align-items: flex-start;
