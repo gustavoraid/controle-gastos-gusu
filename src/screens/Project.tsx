@@ -72,9 +72,14 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   const settingsBtn = (
     <button className="icon-btn" aria-label="Ajustes do projeto" onClick={() => go(`/p/${id}/config`)}>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <path d="M4 7h10M18 7h2M4 17h4M12 17h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx="10" cy="17" r="2.2" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M10.3 3h3.4l.5 2.4 1.7.9 2.3-.9 1.7 2.9-1.8 1.6v2.2l1.8 1.6-1.7 2.9-2.3-.9-1.7.9-.5 2.4h-3.4l-.5-2.4-1.7-.9-2.3.9-1.7-2.9 1.8-1.6v-2.2L4.1 8.3l1.7-2.9 2.3.9 1.7-.9z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
       </svg>
     </button>
   );
@@ -105,17 +110,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
               {isTrip ? "Resumo" : "Resumo do mês"}
             </button>
           </div>
-          {tab === "lista" && activity.data && hasDayToReorder(activity.data.expenses) && (
-            <button
-              className={`icon-btn reorder-btn ${reordering ? "active" : ""}`}
-              aria-label="Reordenar despesas"
-              aria-pressed={reordering}
-              onClick={() => setReordering(true)}
-              disabled={reordering}
-            >
-              ⇅
-            </button>
-          )}
         </div>
 
         {activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
@@ -133,6 +127,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             emptyText={isTrip ? "Nada lançado nesta viagem ainda." : "Nada lançado neste mês."}
             groupByDay={!isHome}
             reordering={reordering}
+            onStartReorder={() => setReordering(true)}
             onExitReorder={() => setReordering(false)}
             onChanged={() => {
               reloadActivity.current?.();
@@ -169,13 +164,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
       )}
     </>
   );
-}
-
-/** Há algum dia com 2+ despesas (senão não há o que reordenar). */
-function hasDayToReorder(expenses: Expense[]): boolean {
-  const perDay = new Map<string, number>();
-  for (const e of expenses) perDay.set(e.spentOn, (perDay.get(e.spentOn) ?? 0) + 1);
-  return [...perDay.values()].some((n) => n > 1);
 }
 
 function BalanceBanner(props: {
@@ -234,9 +222,11 @@ function ActivityList(props: {
   expenses: Expense[];
   settlements: Settlement[];
   emptyText: string;
-  /** false: lista corrida, com a data em cada linha (o modo reordenar continua por dia). */
+  /** false: lista corrida, com a data em cada linha e sem reordenar (Casa). */
   groupByDay: boolean;
   reordering: boolean;
+  /** ⇅ no cabeçalho de um dia: entra no modo reordenar (vale para todos os dias). */
+  onStartReorder: () => void;
   onExitReorder: () => void;
   onChanged: () => void;
 }) {
@@ -386,7 +376,14 @@ function ActivityList(props: {
     <div className="activity">
       {groups.map((g) => (
         <section key={g.date}>
-          <h2 className="day-label">{dayLabel(g.date)}</h2>
+          <div className="day-head">
+            <h2 className="day-label">{dayLabel(g.date)}</h2>
+            {dayExpenses(g).length > 1 && (
+              <button className="reorder-day" aria-label={`Reordenar despesas (${dayLabel(g.date)})`} onClick={props.onStartReorder}>
+                ⇅ Reordenar
+              </button>
+            )}
+          </div>
           <ul className="list">{g.items.map(renderItem)}</ul>
         </section>
       ))}

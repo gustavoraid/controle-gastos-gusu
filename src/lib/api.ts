@@ -1,6 +1,7 @@
 import { toBrlCents } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
 import type { LogRow } from "@/lib/feed";
+import type { ChangePlan } from "@/lib/settingsDraft";
 import type {
   Category,
   Expense,
@@ -285,8 +286,11 @@ export async function removeCurrency(projectId: string, code: string, wasDefault
 
 // ---------------------------------------------------------------- categorias
 
-export async function addCategory(projectId: string, name: string, emoji: string, position: number) {
-  check(await supabase.from("categories").insert({ project_id: projectId, name, emoji, position }));
+export async function addCategory(projectId: string, name: string, emoji: string, position: number, archived = false) {
+  const row = check<{ id: string }>(
+    await supabase.from("categories").insert({ project_id: projectId, name, emoji, position, archived }).select("id").single(),
+  );
+  return row.id;
 }
 
 export async function updateCategory(id: string, patch: Partial<Pick<Category, "name" | "emoji" | "archived" | "position">>) {
@@ -303,6 +307,26 @@ export async function addSuggestion(categoryId: string, text: string, position: 
 
 export async function deleteSuggestion(id: string) {
   check(await supabase.from("category_suggestions").delete().eq("id", id));
+}
+
+/**
+ * Grava o "Salvar" dos ajustes. Exclusões vão primeiro: são o que costuma ser
+ * recusado (categoria ou moeda com despesas), e assim nada mais é gravado pela metade.
+ */
+export async function applySettings(projectId: string, plan: ChangePlan, currentDefault: string) {
+  for (const id of plan.removeCategories) await deleteCategory(id);
+  for (const code of plan.removeCurrencies) await removeCurrency(projectId, code, currentDefault === code);
+  for (const c of plan.addCurrencies) await addCurrency(projectId, c.code, c.rate);
+  for (const r of plan.setRates) await setRate(projectId, r.code, r.rate);
+  if (plan.project) await updateProject(projectId, plan.project);
+  if (plan.weights) await setWeights(projectId, plan.weights);
+  for (const id of plan.removeSuggestions) await deleteSuggestion(id);
+  for (const u of plan.updateCategories) await updateCategory(u.id, u.patch);
+  for (const c of plan.addCategories) {
+    const id = await addCategory(projectId, c.name, c.emoji, c.position, c.archived);
+    for (const [i, text] of c.suggestions.entries()) await addSuggestion(id, text, i + 1);
+  }
+  for (const s of plan.addSuggestions) await addSuggestion(s.categoryId, s.text, s.position);
 }
 
 // ---------------------------------------------------------------- despesas
