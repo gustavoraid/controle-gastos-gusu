@@ -1083,6 +1083,23 @@ li.dragging {
   color: var(--muted);
   cursor: default;
 }
+.segmented.small button {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.cat-tag {
+  margin-left: 36px;
+}
+.recurrence-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.recurrence-split strong {
+  color: var(--text);
+}
 
 /* Valor e quem pagou na mesma linha; data logo abaixo */
 .amount-row {

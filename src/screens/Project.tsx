@@ -10,6 +10,7 @@ import { dayLabel, monthLabel, monthRange, navigableMonths, shiftMonth, shortDay
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
+import { splitByRecurrence, type CategoryGroup } from "@/lib/summary";
 import { swipeStep } from "@/lib/swipe";
 import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
@@ -169,6 +170,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
               expenses={activity.data.expenses}
               isTrip={isTrip}
               tripDays={isTrip ? project.tripDays : null}
+              splitRecurrence={isHome}
               onSettings={() => go(`/p/${id}/config`)}
             />
           </>
@@ -452,6 +454,8 @@ function MonthSummary(props: {
   expenses: Expense[];
   isTrip: boolean;
   tripDays: number | null;
+  /** Casa: gastos de categorias não recorrentes aparecem separados. */
+  splitRecurrence: boolean;
   onSettings: () => void;
 }) {
   const { members, cats, expenses, tripDays } = props;
@@ -470,13 +474,8 @@ function MonthSummary(props: {
   for (const e of expenses) if (e.currency !== "BRL") foreign.set(e.currency, (foreign.get(e.currency) ?? 0) + e.amount);
   const foreignTotals = [...foreign.entries()];
 
-  const byCat = new Map<string, number>();
-  for (const e of expenses) {
-    const k = e.categoryId ?? "";
-    byCat.set(k, (byCat.get(k) ?? 0) + e.amountCents);
-  }
-  const catRows = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
-  const max = catRows[0]?.[1] ?? 1;
+  const groups = splitByRecurrence(expenses, (id) => props.splitRecurrence && !!cats.get(id)?.nonRecurring);
+  const split = groups.nonRecurring.total > 0;
 
   const people = members.map((m) => ({
     m,
@@ -502,6 +501,16 @@ function MonthSummary(props: {
           <button type="button" className="btn link small trip-days-hint" onClick={props.onSettings}>
             Informe os dias da viagem nos ajustes para ver o gasto por dia
           </button>
+        )}
+        {split && (
+          <span className="recurrence-split small">
+            <span>
+              Recorrentes <strong>{formatBRL(groups.recurring.total)}</strong>
+            </span>
+            <span>
+              Não recorrentes <strong>{formatBRL(groups.nonRecurring.total)}</strong>
+            </span>
+          </span>
         )}
         {foreignTotals.length > 0 && (
           <span className="muted small">
@@ -536,30 +545,50 @@ function MonthSummary(props: {
         </table>
       </section>
 
-      <section className="card">
-        <h2 className="card-title">Por categoria</h2>
-        <ul className="bars">
-          {catRows.map(([cid, cents]) => {
-            const c = cats.get(cid);
-            return (
-              <li key={cid || "none"}>
-                <div className="row between small">
-                  <span>
-                    {c?.emoji ?? "📦"} {c?.name ?? "Sem categoria"}
-                  </span>
-                  <span>
-                    {formatBRL(cents)} <span className="muted">· {Math.round((cents / total) * 100)}%</span>
-                  </span>
-                </div>
-                {tripDays && <div className="muted small per-day-cat">{formatBRL(perDayCents(cents, tripDays))} por dia</div>}
-                <div className="bar">
-                  <span style={{ width: `${(cents / max) * 100}%` }} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      {split ? (
+        <>
+          <CategoryBars title="Recorrentes" group={groups.recurring} cats={cats} tripDays={tripDays} />
+          <CategoryBars title="Não recorrentes" group={groups.nonRecurring} cats={cats} tripDays={tripDays} />
+        </>
+      ) : (
+        <CategoryBars title="Por categoria" group={groups.recurring} cats={cats} tripDays={tripDays} />
+      )}
     </div>
+  );
+}
+
+/** Barras por categoria; o percentual é sobre o total do próprio grupo. */
+function CategoryBars(props: { title: string; group: CategoryGroup; cats: Map<string, Category>; tripDays: number | null }) {
+  const { group, cats, tripDays } = props;
+  if (group.rows.length === 0) return null;
+  const max = group.rows[0].cents || 1;
+  return (
+    <section className="card">
+      <h2 className="card-title row between">
+        <span>{props.title}</span>
+        <span className="muted">{formatBRL(group.total)}</span>
+      </h2>
+      <ul className="bars">
+        {group.rows.map(({ categoryId: cid, cents }) => {
+          const c = cats.get(cid);
+          return (
+            <li key={cid || "none"}>
+              <div className="row between small">
+                <span>
+                  {c?.emoji ?? "📦"} {c?.name ?? "Sem categoria"}
+                </span>
+                <span>
+                  {formatBRL(cents)} <span className="muted">· {Math.round((cents / group.total) * 100)}%</span>
+                </span>
+              </div>
+              {tripDays && <div className="muted small per-day-cat">{formatBRL(perDayCents(cents, tripDays))} por dia</div>}
+              <div className="bar">
+                <span style={{ width: `${(cents / max) * 100}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

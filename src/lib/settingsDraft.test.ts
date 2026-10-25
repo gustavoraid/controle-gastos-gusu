@@ -14,8 +14,8 @@ const base: SettingsBase = {
     { code: "PEN", rate: 1.58 },
   ],
   categories: [
-    { id: "c1", name: "Comida", emoji: "🍽️", position: 1, archived: false, suggestions: [{ id: "s1", text: "Almoço", position: 1 }] },
-    { id: "c2", name: "Passeios", emoji: "🏔️", position: 2, archived: false, suggestions: [] },
+    { id: "c1", name: "Comida", emoji: "🍽️", position: 1, archived: false, nonRecurring: false, suggestions: [{ id: "s1", text: "Almoço", position: 1 }] },
+    { id: "c2", name: "Passeios", emoji: "🏔️", position: 2, archived: false, nonRecurring: false, suggestions: [] },
   ],
 };
 
@@ -60,14 +60,19 @@ describe("planChanges", () => {
     const plan = planChanges(base, {
       ...d,
       categories: [
-        { key: "n1", id: null, name: " Táxi ", emoji: "🚕", archived: false, suggestions: [{ key: "x", id: null, text: "Aeroporto" }] },
+        { key: "n1", id: null, name: " Táxi ", emoji: "🚕", archived: false, nonRecurring: true, suggestions: [{ key: "x", id: null, text: "Aeroporto" }] },
         { ...c1, emoji: "🍕", suggestions: [{ key: "y", id: null, text: " Jantar " }] },
       ],
     });
     expect(plan.removeCategories).toEqual(["c2"]);
     expect(plan.updateCategories).toEqual([{ id: "c1", patch: { emoji: "🍕", position: 2 } }]);
-    expect(plan.addCategories).toEqual([{ name: "Táxi", emoji: "🚕", archived: false, position: 1, suggestions: ["Aeroporto"] }]);
+    expect(plan.addCategories).toEqual([
+      { name: "Táxi", emoji: "🚕", archived: false, nonRecurring: true, position: 1, suggestions: ["Aeroporto"] },
+    ]);
     expect(plan.removeSuggestions).toEqual(["s1"]);
+    expect(planChanges(base, { ...d, categories: [{ ...c1, nonRecurring: true }, d.categories[1]] }).updateCategories).toEqual([
+      { id: "c1", patch: { non_recurring: true } },
+    ]);
     expect(plan.addSuggestions).toEqual([{ categoryId: "c1", text: "Jantar", position: 2 }]);
   });
 });
