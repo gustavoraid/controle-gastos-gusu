@@ -79,7 +79,7 @@ export function NewProject({ me }: { me: string }) {
           <p className="muted small">
             {source
               ? `Copia de “${source.name}” a proporção, as moedas (com a cotação), as categorias e as descrições sugeridas. As despesas não são copiadas.`
-              : "Começa com Mercado, Contas, Casa, Restaurante… e descrições sugeridas (Luz, Feira, Aluguel…). Tudo editável em Ajustes. O projeto já nasce com vocês dois, dividindo 50/50."}
+              : "Começa com Mercado, Contas, Casa, Restaurante… e descrições sugeridas (Luz, Feira, Aluguel…). Tudo editável em Ajustes. O projeto já nasce com os dois, dividindo 50/50."}
           </p>
 
           <button className="btn primary big" disabled={busy || !name.trim()}>

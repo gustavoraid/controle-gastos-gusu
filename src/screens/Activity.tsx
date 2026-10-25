@@ -68,18 +68,18 @@ function Feed(props: { me: string; data: Awaited<ReturnType<typeof listRecentAct
               const unseen = isUnseen(it, me, props.lastSeen);
               const open = () =>
                 go(it.entity === "expense" && !it.gone ? `/p/${it.projectId}/add?e=${it.entityId}` : `/p/${it.projectId}`);
-              const changes = feedChanges(it, me, name);
+              const changes = feedChanges(it, name);
               const s = it.summary;
               return (
                 <li key={it.id}>
                   <button className={`list-item compact feed-item ${unseen ? "unseen" : ""}`} onClick={open}>
                     <Avatar name={it.actor ? name(it.actor) : "?"} size={30} color={it.actor ? colorOf.get(it.actor) : undefined} />
                     <span className="grow min0">
-                      <strong className="feed-title">{feedTitle(it, me, name)}</strong>
+                      <strong className="feed-title">{feedTitle(it, name)}</strong>
                       <span className="muted small ellipsis">
                         {project ? `${project.emoji} ${project.name}` : "Projeto"} · {timeFmt.format(new Date(it.createdAt))}
                         {it.entity === "expense" && it.action === "created" && s.paid_by !== it.actor &&
-                          ` · pago por ${s.paid_by === me ? "você" : name(s.paid_by)}`}
+                          ` · pago por ${name(s.paid_by)}`}
                       </span>
                       {changes.length > 0 && <span className="feed-changes small">{changes.join(" · ")}</span>}
                     </span>

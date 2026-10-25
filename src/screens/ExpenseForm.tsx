@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DateChips } from "@/components/DateChips";
-import { Chip, ErrorBox, Header, Loading, haptic, toast } from "@/components/ui";
+import { Chip, ErrorBox, Header, Loading, PERSON_COLORS, haptic, toast } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { useProject } from "@/hooks/useProject";
 import { back } from "@/hooks/useRoute";
@@ -150,34 +150,57 @@ function Form(props: {
     </button>
   ) : undefined;
 
+  const payerIndex = members.findIndex((m) => m.userId === paidBy);
+  const payer = members[payerIndex];
+
   return (
     <>
       <Header title={existing ? "Editar despesa" : "Nova despesa"} onBack={() => back(`/p/${projectId}`)} action={deleteBtn} />
       <form className="page expense-form compact" onSubmit={submit}>
-        <label className="amount-field">
-          {currencies.length > 1 ? (
+        <div className="amount-row">
+          <label className="amount-field">
+            {currencies.length > 1 ? (
+              <button
+                type="button"
+                className="currency-btn"
+                onClick={() => setCurrency(currencies[(currencies.findIndex((c) => c.code === currency) + 1) % currencies.length].code)}
+                aria-label={`Moeda: ${currency}. Toque para trocar`}
+              >
+                {foreign ? currency : "R$"} <span aria-hidden="true">▾</span>
+              </button>
+            ) : (
+              <span className="currency">R$</span>
+            )}
+            <input
+              ref={amountRef}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder={currencyDecimals(currency) === 0 ? "0" : "0,00"}
+              aria-label="Valor"
+              enterKeyHint="next"
+              autoComplete="off"
+            />
+          </label>
+          {members.length > 1 && (
+            // Um botão só: tocar alterna entre as pessoas (são duas).
             <button
               type="button"
-              className="currency-btn"
-              onClick={() => setCurrency(currencies[(currencies.findIndex((c) => c.code === currency) + 1) % currencies.length].code)}
-              aria-label={`Moeda: ${currency}. Toque para trocar`}
+              className="payer-toggle"
+              onClick={() => {
+                const i = members.findIndex((m) => m.userId === paidBy);
+                setPaidBy(members[(i + 1) % members.length].userId);
+              }}
+              aria-label={`Pago por ${payer?.name}. Toque para trocar`}
             >
-              {foreign ? currency : "R$"} <span aria-hidden="true">▾</span>
+              <span className="muted small">pago por ⇄</span>
+              {/* Só as duas primeiras letras (Gu / Su), na cor da pessoa. */}
+              <span className="payer-chip" style={{ background: PERSON_COLORS[Math.max(0, payerIndex) % PERSON_COLORS.length] }}>
+                {payer?.name ?? "?"}
+              </span>
             </button>
-          ) : (
-            <span className="currency">R$</span>
           )}
-          <input
-            ref={amountRef}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))}
-            inputMode="decimal"
-            placeholder={currencyDecimals(currency) === 0 ? "0" : "0,00"}
-            aria-label="Valor"
-            enterKeyHint="next"
-            autoComplete="off"
-          />
-        </label>
+        </div>
         {info.length > 0 && (
           <p className="muted small conversion">
             {info.map((line) => (
@@ -185,6 +208,8 @@ function Form(props: {
             ))}
           </p>
         )}
+
+        <DateChips value={date} onChange={setDate} />
 
         <div className="field">
           <span>Categoria</span>
@@ -225,24 +250,6 @@ function Form(props: {
               ))}
             </div>
           )}
-        </div>
-
-        {members.length > 1 && (
-          <div className="field">
-            <span>Quem pagou</span>
-            <div className="segmented">
-              {members.map((m) => (
-                <button type="button" key={m.userId} className={paidBy === m.userId ? "active" : ""} onClick={() => setPaidBy(m.userId)}>
-                  {m.userId === me ? "Eu" : m.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="field">
-          <span>Quando</span>
-          <DateChips value={date} onChange={setDate} />
         </div>
 
         <div className="sticky-actions">

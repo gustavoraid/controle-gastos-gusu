@@ -200,19 +200,11 @@ function BalanceBanner(props: {
     <section className="balance-banner">
       <span className="muted small">{props.label}</span>
       {mine.length === 0 ? (
-        <p className="balance-title">Tudo certo entre vocês ✨</p>
+        <p className="balance-title">Tudo certo entre {members.map((m) => m.name).join(" e ")} ✨</p>
       ) : (
         mine.map((t) => (
           <p key={t.from + t.to} className="balance-title">
-            {t.to === me ? (
-              <>
-                {name(t.from)} te deve <Money cents={t.amountCents} tone="pos" />
-              </>
-            ) : (
-              <>
-                Você deve <Money cents={t.amountCents} tone="neg" /> a {name(t.to)}
-              </>
-            )}
+            {name(t.from)} deve <Money cents={t.amountCents} tone={t.to === me ? "pos" : "neg"} /> a {name(t.to)}
           </p>
         ))
       )}
@@ -371,7 +363,7 @@ function ActivityList(props: {
             <strong className="ellipsis">Acerto de contas</strong>
             <span className="payer small">
               <Avatar name={names.get(it.s.fromUser) ?? "?"} size={16} color={props.colors.get(it.s.fromUser)} />
-              {it.s.fromUser === me ? "Você" : names.get(it.s.fromUser)} → {it.s.toUser === me ? "você" : names.get(it.s.toUser)}
+              {names.get(it.s.fromUser)} → {names.get(it.s.toUser)}
               {day(it.date) && <> · {day(it.date)}</>}
             </span>
           </span>
@@ -421,7 +413,7 @@ function ExpenseRow(props: {
   /** Alça de arrastar: quando presente, a linha está no modo "Reordenar" (sem abrir a despesa). */
   handle?: ReactNode;
 }) {
-  const { e, me, names, cat } = props;
+  const { e, names, cat } = props;
   const payerName = names.get(e.paidBy) ?? "?";
   const content = (
     <>
@@ -432,7 +424,7 @@ function ExpenseRow(props: {
           {/* bolinha com a inicial na cor da pessoa: dá para ver quem pagou de relance */}
           <span className="payer small">
             <Avatar name={payerName} size={16} color={props.color} />
-            {e.paidBy === me ? "Você" : payerName}
+            {payerName}
             {props.day && <> · {props.day}</>}
           </span>
         </span>

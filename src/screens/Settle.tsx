@@ -39,7 +39,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
   const [draftId] = useState(newId);
 
   const member = (uid: string) => members.find((m) => m.userId === uid);
-  const name = (uid: string) => (uid === me ? "Eu" : member(uid)?.name ?? "?");
+  const name = (uid: string) => member(uid)?.name ?? "?";
   const color = (uid: string) => PERSON_COLORS[Math.max(0, members.findIndex((m) => m.userId === uid)) % PERSON_COLORS.length];
   const cents = parseAmountToCents(amount);
 
@@ -76,7 +76,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
     <>
       <Header title="Acertar contas" onBack={() => back(`/p/${projectId}`)} />
       <form className="page stack" onSubmit={submit}>
-        <p className="muted">Registre um Pix/transferência entre vocês. Isso zera (ou reduz) o saldo.</p>
+        <p className="muted">Registre um Pix/transferência entre {members.map((m) => m.name).join(" e ")}. Isso zera (ou reduz) o saldo.</p>
 
         <div className="settle-flow">
           {person(from, "paga")}
@@ -95,11 +95,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
         {suggestion && (
           <p className="muted small">
             Saldo atual:{" "}
-            {suggestion.to === me
-              ? `${name(suggestion.from)} te deve ${formatBRL(suggestion.amountCents)}.`
-              : suggestion.from === me
-                ? `você deve ${formatBRL(suggestion.amountCents)} a ${name(suggestion.to)}.`
-                : `${name(suggestion.from)} deve ${formatBRL(suggestion.amountCents)} a ${name(suggestion.to)}.`}
+            {`${name(suggestion.from)} deve ${formatBRL(suggestion.amountCents)} a ${name(suggestion.to)}.`}
           </p>
         )}
 
