@@ -30,6 +30,8 @@ export interface Category {
   emoji: string;
   position: number;
   archived: boolean;
+  /** Gasto pontual (não recorrente): o Resumo da Casa mostra separado. */
+  nonRecurring: boolean;
   suggestions: Suggestion[];
 }
 

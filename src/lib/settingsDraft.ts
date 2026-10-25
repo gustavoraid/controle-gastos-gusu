@@ -28,6 +28,7 @@ export interface CategoryDraft {
   name: string;
   emoji: string;
   archived: boolean;
+  nonRecurring: boolean;
   suggestions: { key: string; id: string | null; text: string }[];
 }
 
@@ -56,6 +57,7 @@ export function draftFrom(base: SettingsBase): SettingsDraft {
       name: c.name,
       emoji: c.emoji,
       archived: c.archived,
+      nonRecurring: c.nonRecurring,
       suggestions: c.suggestions.map((s) => ({ key: s.id, id: s.id, text: s.text })),
     })),
   };
@@ -85,8 +87,18 @@ export interface ChangePlan {
   /** Muda proporção ou cotação de moeda já existente → recalcula as despesas lançadas. */
   recalc: boolean;
   removeCategories: string[];
-  updateCategories: { id: string; patch: Partial<{ name: string; emoji: string; archived: boolean; position: number }> }[];
-  addCategories: { name: string; emoji: string; archived: boolean; position: number; suggestions: string[] }[];
+  updateCategories: {
+    id: string;
+    patch: Partial<{ name: string; emoji: string; archived: boolean; non_recurring: boolean; position: number }>;
+  }[];
+  addCategories: {
+    name: string;
+    emoji: string;
+    archived: boolean;
+    nonRecurring: boolean;
+    position: number;
+    suggestions: string[];
+  }[];
   removeSuggestions: string[];
   addSuggestions: { categoryId: string; text: string; position: number }[];
 }
@@ -130,7 +142,7 @@ export function planChanges(base: SettingsBase, d: SettingsDraft): ChangePlan {
     const name = c.name.trim();
     const texts = c.suggestions.map((s) => s.text.trim()).filter(Boolean);
     if (!c.id) {
-      addCategories.push({ name, emoji: c.emoji, archived: c.archived, position, suggestions: texts });
+      addCategories.push({ name, emoji: c.emoji, archived: c.archived, nonRecurring: c.nonRecurring, position, suggestions: texts });
       return;
     }
     const old = oldCats.get(c.id)!;
@@ -138,6 +150,7 @@ export function planChanges(base: SettingsBase, d: SettingsDraft): ChangePlan {
     if (name !== old.name) patch.name = name;
     if (c.emoji !== old.emoji) patch.emoji = c.emoji;
     if (c.archived !== old.archived) patch.archived = c.archived;
+    if (c.nonRecurring !== old.nonRecurring) patch.non_recurring = c.nonRecurring;
     if (position !== old.position) patch.position = position;
     if (Object.keys(patch).length) updateCategories.push({ id: c.id, patch });
 

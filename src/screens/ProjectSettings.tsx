@@ -390,6 +390,7 @@ function Categories({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
       name: newName.trim(),
       emoji: newEmoji || "🏷️",
       archived: false,
+      nonRecurring: false,
       suggestions: [],
     };
     set({ categories: [...cats, cat] });
@@ -401,7 +402,7 @@ function Categories({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
       <h2 className="card-title">Categorias e descrições sugeridas</h2>
       <p className="muted small">
         Arraste pela alça ≡ para mudar a ordem (é a ordem dos botões ao lançar). As sugestões aparecem como atalho ao
-        lançar uma despesa na categoria.
+        lançar uma despesa na categoria.{draft.type === "casa" && " Marque como “não recorrente” o que é gasto pontual (reforma, compra grande): o Resumo do mês mostra separado."}
       </p>
       <SortableList
         className="cat-edit-list"
@@ -424,9 +425,13 @@ function Categories({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
                 {c.suggestions.length} {open === c.key ? "▲" : "▼"}
               </button>
             </div>
+            {draft.type === "casa" && c.nonRecurring && open !== c.key && (
+              <span className="muted small cat-tag">Não recorrente</span>
+            )}
             {open === c.key && (
               <SuggestionsEditor
                 category={c}
+                showRecurrence={draft.type === "casa"}
                 onChange={(patch) => update(c.key, patch)}
                 onDelete={() => set({ categories: cats.filter((x) => x.key !== c.key) })}
               />
@@ -472,6 +477,8 @@ function IconInput({ value, onChange, label }: { value: string; onChange: (v: st
 
 function SuggestionsEditor(props: {
   category: CategoryDraft;
+  /** Casa: marcar como não recorrente (o Resumo mostra separado). */
+  showRecurrence: boolean;
   onChange: (patch: Partial<CategoryDraft>) => void;
   onDelete: () => void;
 }) {
@@ -487,6 +494,16 @@ function SuggestionsEditor(props: {
 
   return (
     <div className="suggestions-editor">
+      {props.showRecurrence && (
+        <div className="segmented small" aria-label="Tipo de gasto">
+          <button type="button" className={c.nonRecurring ? "" : "active"} onClick={() => onChange({ nonRecurring: false })}>
+            Recorrente
+          </button>
+          <button type="button" className={c.nonRecurring ? "active" : ""} onClick={() => onChange({ nonRecurring: true })}>
+            Não recorrente
+          </button>
+        </div>
+      )}
       {c.suggestions.length === 0 ? (
         <p className="muted small">Nenhuma sugestão ainda.</p>
       ) : (

@@ -156,6 +156,7 @@ export async function getProject(id: string) {
         emoji: c.emoji,
         position: c.position,
         archived: c.archived,
+        nonRecurring: !!c.non_recurring,
         suggestions: (c.category_suggestions ?? [])
           .map((sg: any) => ({ id: sg.id, text: sg.text, position: sg.position }))
           .sort((a: Suggestion, b: Suggestion) => a.position - b.position || a.text.localeCompare(b.text)),
@@ -286,14 +287,24 @@ export async function removeCurrency(projectId: string, code: string, wasDefault
 
 // ---------------------------------------------------------------- categorias
 
-export async function addCategory(projectId: string, name: string, emoji: string, position: number, archived = false) {
+export async function addCategory(
+  projectId: string,
+  name: string,
+  emoji: string,
+  position: number,
+  archived = false,
+  nonRecurring = false,
+) {
   const row = check<{ id: string }>(
-    await supabase.from("categories").insert({ project_id: projectId, name, emoji, position, archived }).select("id").single(),
+    await supabase.from("categories").insert({ project_id: projectId, name, emoji, position, archived, non_recurring: nonRecurring }).select("id").single(),
   );
   return row.id;
 }
 
-export async function updateCategory(id: string, patch: Partial<Pick<Category, "name" | "emoji" | "archived" | "position">>) {
+export async function updateCategory(
+  id: string,
+  patch: Partial<Pick<Category, "name" | "emoji" | "archived" | "position"> & { non_recurring: boolean }>,
+) {
   check(await supabase.from("categories").update(patch).eq("id", id));
 }
 
@@ -323,7 +334,7 @@ export async function applySettings(projectId: string, plan: ChangePlan, current
   for (const id of plan.removeSuggestions) await deleteSuggestion(id);
   for (const u of plan.updateCategories) await updateCategory(u.id, u.patch);
   for (const c of plan.addCategories) {
-    const id = await addCategory(projectId, c.name, c.emoji, c.position, c.archived);
+    const id = await addCategory(projectId, c.name, c.emoji, c.position, c.archived, c.nonRecurring);
     for (const [i, text] of c.suggestions.entries()) await addSuggestion(id, text, i + 1);
   }
   for (const s of plan.addSuggestions) await addSuggestion(s.categoryId, s.text, s.position);
