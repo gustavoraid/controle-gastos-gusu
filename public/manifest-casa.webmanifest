@@ -1,7 +1,7 @@
 {
   "name": "Despesa na Casa",
   "short_name": "+ Casa",
-  "description": "Lança uma despesa direto no projeto Casa do Gastos GuSu.",
+  "description": "Lança uma despesa direto no projeto Casa no Ratata.",
   "lang": "pt-BR",
   "id": "./nova-despesa.html",
   "start_url": "./nova-despesa.html#/add/casa",

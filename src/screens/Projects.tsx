@@ -40,7 +40,7 @@ export function Projects({ me }: { me: string }) {
   return (
     <>
       <Header
-        title="Gastos GuSu"
+        title="Ratata"
         left={
           <button
             className="icon-btn bell"

@@ -24,7 +24,7 @@ export function Login() {
   return (
     <main className="login">
       <img src="icons/icon.svg" alt="" className="login-logo" />
-      <h1>Gastos GuSu</h1>
+      <h1>Ratata</h1>
       <p className="muted">Quem pagou, quanto cada um deve, sem planilha.</p>
 
       <form onSubmit={submit} className="stack">
