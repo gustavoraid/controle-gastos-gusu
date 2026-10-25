@@ -150,6 +150,9 @@ function Form(props: {
     </button>
   ) : undefined;
 
+  const payerIndex = members.findIndex((m) => m.userId === paidBy);
+  const payer = members[payerIndex];
+
   return (
     <>
       <Header title={existing ? "Editar despesa" : "Nova despesa"} onBack={() => back(`/p/${projectId}`)} action={deleteBtn} />
@@ -180,20 +183,22 @@ function Form(props: {
             />
           </label>
           {members.length > 1 && (
-            <div className="payer-pick" role="group" aria-label="Quem pagou">
-              {members.map((m, i) => (
-                <button
-                  type="button"
-                  key={m.userId}
-                  className={paidBy === m.userId ? "active" : ""}
-                  onClick={() => setPaidBy(m.userId)}
-                  aria-pressed={paidBy === m.userId}
-                >
-                  <Avatar name={m.name} size={20} color={PERSON_COLORS[i % PERSON_COLORS.length]} />
-                  {m.userId === me ? "Eu" : m.name}
-                </button>
-              ))}
-            </div>
+            // Um botão só: tocar alterna entre as pessoas (são duas).
+            <button
+              type="button"
+              className="payer-toggle"
+              onClick={() => {
+                const i = members.findIndex((m) => m.userId === paidBy);
+                setPaidBy(members[(i + 1) % members.length].userId);
+              }}
+              aria-label={`Pago por ${payer?.userId === me ? "mim" : payer?.name}. Toque para trocar`}
+            >
+              <span className="muted small">pago por ⇄</span>
+              <span className="payer-name">
+                <Avatar name={payer?.name ?? "?"} size={22} color={PERSON_COLORS[Math.max(0, payerIndex) % PERSON_COLORS.length]} />
+                <span className="who">{payer?.userId === me ? "Eu" : payer?.name}</span>
+              </span>
+            </button>
           )}
         </div>
         {info.length > 0 && (

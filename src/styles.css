@@ -1096,35 +1096,41 @@ li.dragging {
   justify-content: flex-start;
 }
 .expense-form.compact .amount-row .amount-field input {
-  font-size: 38px !important;
+  font-size: 36px !important;
   width: 100% !important;
   min-width: 0;
 }
-.payer-pick {
+.payer-toggle {
   flex: none;
+  width: 116px; /* fixo: alternar entre "Eu" e "Suellen" não mexe no espaço do valor */
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
 }
-.payer-pick button {
+.payer-toggle:active {
+  background: var(--surface-2);
+}
+.payer-name {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 108px;
-  padding: 6px 10px 6px 6px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 650;
 }
-.payer-pick button.active {
-  border-color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 14%, var(--surface));
-  color: var(--text);
+.payer-name .who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .expense-form.compact .conversion {
   align-items: flex-start;
