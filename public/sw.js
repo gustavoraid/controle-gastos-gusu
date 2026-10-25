@@ -1,6 +1,6 @@
 // Service worker mínimo: deixa o app abrir rápido (e sem internet) guardando
 // o "esqueleto" (HTML/JS/CSS/ícones). Dados do Supabase nunca são cacheados.
-const CACHE = "gastos-v5"; // trocar a versão força os celulares a buscar o manifesto novo
+const CACHE = "gastos-v6"; // trocar a versão força os celulares a buscar o manifesto novo
 
 self.addEventListener("install", (e) => {
   const shell = ["./", "./manifest.webmanifest", "./icons/icon.svg"].map((u) => new Request(u, { cache: "reload" }));

@@ -70,7 +70,7 @@ export function Projects({ me }: { me: string }) {
             {data.length === 0 && (
               <div className="empty">
                 <p className="empty-emoji">👋</p>
-                <p>Crie um projeto (Casa, Viagem…). Ele já nasce com vocês dois.</p>
+                <p>Crie um projeto (Casa, Viagem…). Ele já nasce com os dois.</p>
               </div>
             )}
 
@@ -128,7 +128,7 @@ export function BalanceLine({ cents, big }: { cents: number; big?: boolean }) {
   if (cents === 0) return <span className={`balance muted ${big ? "big" : ""}`}>quitado</span>;
   return (
     <span className={`balance ${big ? "big" : ""}`}>
-      <span className="small muted">{cents > 0 ? "a receber" : "você deve"}</span>
+      <span className="small muted">{cents > 0 ? "a receber" : "a pagar"}</span>
       <Money cents={Math.abs(cents)} tone={cents > 0 ? "pos" : "neg"} />
     </span>
   );

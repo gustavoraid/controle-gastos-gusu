@@ -51,23 +51,23 @@ const VERB = {
   settlement: { created: "registrou", updated: "editou", deleted: "apagou" },
 } as const;
 
-/** "Suellen lançou Jantar" / "Você apagou um pagamento para Suellen" etc. */
-export function feedTitle(item: LogRow, me: string, name: (uid: string) => string): string {
-  const person = (uid: string | null, cap: boolean) => (uid === me ? (cap ? "Você" : "você") : uid ? name(uid) : "?");
-  const who = person(item.actor, true);
+/** "Su lançou Jantar" / "Gu apagou um pagamento para Su" etc. (sem "você": sempre o nome). */
+export function feedTitle(item: LogRow, name: (uid: string) => string): string {
+  const person = (uid: string | null) => (uid ? name(uid) : "?");
+  const who = person(item.actor);
   const verb = VERB[item.entity][item.action];
   if (item.entity === "expense") return `${who} ${verb} ${item.summary.description}`;
   const { from_user: from, to_user: to } = item.summary;
-  if (from === item.actor) return `${who} ${verb} um pagamento para ${person(to, false)}`;
-  return `${who} ${verb} um pagamento de ${person(from, false)} para ${person(to, false)}`;
+  if (from === item.actor) return `${who} ${verb} um pagamento para ${person(to)}`;
+  return `${who} ${verb} um pagamento de ${person(from)} para ${person(to)}`;
 }
 
 const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /** O que mudou numa edição, em frases curtas: "valor PEN 40,00 → PEN 45,00". */
-export function feedChanges(item: LogRow, me: string, name: (uid: string) => string): string[] {
+export function feedChanges(item: LogRow, name: (uid: string) => string): string[] {
   if (item.action !== "updated" || !item.changes) return [];
-  const person = (uid: string) => (uid === me ? "você" : name(uid));
+  const person = name;
   const c = item.changes;
   const out: string[] = [];
   if (c.description) out.push(`descrição “${c.description[0]}” → “${c.description[1]}”`);

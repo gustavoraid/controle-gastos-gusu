@@ -1,4 +1,5 @@
 import { toBrlCents } from "@/lib/currency";
+import { shortName } from "@/lib/people";
 import { supabase } from "@/lib/supabase";
 import type { LogRow } from "@/lib/feed";
 import type { ChangePlan } from "@/lib/settingsDraft";
@@ -57,7 +58,7 @@ const mapProject = (r: any): Project => ({
 
 const mapMembers = (rows: any[]): Member[] =>
   rows
-    .map((m) => ({ userId: m.user_id, name: m.profiles?.display_name ?? "?", weight: Number(m.weight) }))
+    .map((m) => ({ userId: m.user_id, name: shortName(m.profiles?.display_name), weight: Number(m.weight) }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
 const mapCurrencies = (rows: any[]): ProjectCurrency[] =>
@@ -259,7 +260,7 @@ export async function listRecentActivity(limit = 50) {
       }),
     ),
     projects: new Map(check<any[]>(projects).map((p) => [p.id as string, { name: p.name as string, emoji: p.emoji as string }])),
-    people: check<any[]>(profiles).map((p) => ({ id: p.id as string, name: p.display_name as string })),
+    people: check<any[]>(profiles).map((p) => ({ id: p.id as string, name: shortName(p.display_name) })),
     rates,
   };
 }

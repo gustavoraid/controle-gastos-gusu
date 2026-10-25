@@ -1100,3 +1100,50 @@ li.dragging {
 .recurrence-split strong {
   color: var(--text);
 }
+
+/* Valor e quem pagou na mesma linha; data logo abaixo */
+.amount-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.amount-row .amount-field {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.expense-form.compact .amount-row .amount-field input {
+  font-size: 40px !important;
+  width: 100% !important;
+  min-width: 0;
+}
+.payer-toggle {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.payer-toggle:active {
+  background: var(--surface-2);
+}
+.payer-chip {
+  min-width: 52px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+  text-align: center;
+  line-height: 1.2;
+}
+.expense-form.compact .conversion {
+  align-items: flex-start;
+}
