@@ -60,6 +60,8 @@ function Form(props: {
   const [amount, setAmount] = useState(existing ? minorToInput(existing.amount, existing.currency) : "");
   const [description, setDescription] = useState(existing?.description ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
+  // Lista de categorias aberta só enquanto não há uma escolhida (ou ao tocar para trocar).
+  const [catOpen, setCatOpen] = useState(!existing?.categoryId);
   const [paidBy, setPaidBy] = useState(existing?.paidBy ?? (isMember ? me : members[0]?.userId));
   const [date, setDate] = useState(existing?.spentOn ?? todayISO());
   const [busy, setBusy] = useState(false);
@@ -91,6 +93,9 @@ function Form(props: {
     // Descrição que veio de sugestão da categoria anterior não faz sentido na nova.
     if (id !== categoryId && category?.suggestions.some((sg) => sg.text === desc)) setDescription("");
     setCategoryId(id);
+    setCatOpen(false);
+    // Sem sugestões, o próximo passo é digitar: já abre o teclado na descrição.
+    if (!categories.find((c) => c.id === id)?.suggestions.length) setTimeout(() => descRef.current?.focus(), 0);
   }
 
   async function submit(e: FormEvent) {
@@ -209,48 +214,65 @@ function Form(props: {
           </p>
         )}
 
-        <DateChips value={date} onChange={setDate} />
-
         <div className="field">
-          <span>Categoria</span>
-          <div className="cat-chips" role="group" aria-label="Categoria">
-          {categories.map((c) => (
-            <button
-              type="button"
-              key={c.id}
-              className={`chip cat-chip ${categoryId === c.id ? "active" : ""}`}
-              onClick={() => pickCategory(c.id)}
-              aria-pressed={categoryId === c.id}
-            >
-              <span aria-hidden="true">{c.emoji}</span> {c.name}
-            </button>
-          ))}
-          </div>
+          <span>Quando</span>
+          <DateChips value={date} onChange={setDate} />
         </div>
 
         <div className="field">
-          <span>Descrição</span>
-          <input
-            ref={descRef}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={category?.suggestions.length ? "Toque numa sugestão ou escreva" : "Ex.: Jantar, Táxi, Mercado"}
-            maxLength={120}
-            aria-label="Descrição"
-            aria-required="true"
-            enterKeyHint="done"
-            autoCapitalize="sentences"
-          />
-          {category && category.suggestions.length > 0 && (
-            <div className="chips">
-              {category.suggestions.map((sg) => (
-                <Chip key={sg.id} active={desc === sg.text} onClick={() => setDescription(sg.text)}>
-                  {sg.text}
-                </Chip>
+          <span>Categoria</span>
+          {category && !catOpen ? (
+            // Escolhida: as outras somem; tocar na escolhida abre a lista de novo.
+            <div className="cat-chips">
+              <button type="button" className="chip cat-chip active" onClick={() => setCatOpen(true)} aria-label={`Categoria: ${category.name}. Toque para trocar`}>
+                <span aria-hidden="true">{category.emoji}</span> {category.name}
+              </button>
+              <button type="button" className="btn link small" onClick={() => setCatOpen(true)}>
+                trocar
+              </button>
+            </div>
+          ) : (
+            <div className="cat-chips" role="group" aria-label="Categoria">
+              {categories.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  className={`chip cat-chip ${categoryId === c.id ? "active" : ""}`}
+                  onClick={() => pickCategory(c.id)}
+                  aria-pressed={categoryId === c.id}
+                >
+                  <span aria-hidden="true">{c.emoji}</span> {c.name}
+                </button>
               ))}
             </div>
           )}
         </div>
+
+        {category && (
+          <div className="field">
+            <span>Descrição</span>
+            {category.suggestions.length > 0 && (
+              <div className="chips">
+                {category.suggestions.map((sg) => (
+                  <Chip key={sg.id} active={desc === sg.text} onClick={() => setDescription(sg.text)}>
+                    {sg.text}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            <input
+              ref={descRef}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={category.suggestions.length ? "Ou escreva outra" : "Ex.: Jantar, Táxi, Mercado"}
+              maxLength={120}
+              aria-label="Descrição"
+              aria-required="true"
+              enterKeyHint="done"
+              autoCapitalize="sentences"
+            />
+          </div>
+        )}
 
         <div className="sticky-actions">
           <button className="btn primary big" disabled={busy || !minor || !categoryId || !desc}>
