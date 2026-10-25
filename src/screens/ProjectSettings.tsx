@@ -1,25 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { SortableList } from "@/components/SortableList";
 import { Avatar, ErrorBox, Header, Loading, toast } from "@/components/ui";
 import { useProject } from "@/hooks/useProject";
 import { back, go } from "@/hooks/useRoute";
-import {
-  addCategory,
-  addSuggestion,
-  deleteCategory,
-  deleteProject,
-  deleteSuggestion,
-  listAllForBalance,
-  ratesOf,
-  removeCurrency,
-  setRate,
-  addCurrency,
-  type Rates,
-  setWeights,
-  updateCategory,
-  updateProject,
-} from "@/lib/api";
+import { applySettings, deleteProject, listAllForBalance, ratesOf, type Rates, updateProject } from "@/lib/api";
 import { computeNets, inBrl, suggestTransfers } from "@/lib/balances";
 import {
   CURRENCIES,
@@ -28,21 +13,24 @@ import {
   currencyName,
   formatMoney,
   parseRate,
-  rateToInput,
   toBrlCents,
 } from "@/lib/currency";
+import { firstGrapheme } from "@/lib/emoji";
 import { formatBRL } from "@/lib/money";
 import { moveItem } from "@/lib/order";
-import { parseWeight, percentLabels } from "@/lib/split";
-import { parseTripDays } from "@/lib/trip";
 import {
-  PROJECT_TYPES,
-  type Category,
-  type Member,
-  type Project,
-  type ProjectCurrency,
-  type ProjectType,
-} from "@/lib/types";
+  draftFrom,
+  hasChanges,
+  planChanges,
+  validateDraft,
+  type CategoryDraft,
+  type SettingsBase,
+  type SettingsDraft,
+} from "@/lib/settingsDraft";
+import { parseWeight, percentLabels } from "@/lib/split";
+import { PROJECT_TYPES, type Member, type Project } from "@/lib/types";
+
+type SetDraft = (patch: Partial<SettingsDraft>) => void;
 
 export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
   const proj = useProject(projectId);
@@ -57,69 +45,90 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
     );
   }
   if (!proj.data) return <Loading />;
-  const { project, members, categories, currencies } = proj.data;
+  return <SettingsForm key={projectId} initial={proj.data} me={me} />;
+}
+
+/**
+ * Tudo o que se edita aqui fica num rascunho até o "Salvar" do topo. A base é o
+ * que veio do banco ao abrir a tela (o tempo real não mexe no que está sendo editado).
+ */
+function SettingsForm({ initial, me }: { initial: SettingsBase; me: string }) {
+  const [base] = useState(initial);
+  const [draft, setDraftState] = useState(() => draftFrom(initial));
+  const [saving, setSaving] = useState(false);
+  const set: SetDraft = (patch) => setDraftState((d) => ({ ...d, ...patch }));
+  const { project, members } = base;
+
+  const error = validateDraft(draft);
+  const plan = error ? null : planChanges(base, draft);
+  const dirty = error !== null || (plan !== null && hasChanges(plan));
+
+  function leave() {
+    if (dirty && !confirm("Sair sem salvar as alterações?")) return;
+    back(`/p/${project.id}`);
+  }
+
+  async function save() {
+    if (error) return toast.err(error);
+    if (!plan || !hasChanges(plan)) return;
+    setSaving(true);
+    try {
+      if (plan.recalc) {
+        const rates = ratesOf(base.currencies);
+        const ok = await confirmRecalc({
+          projectId: project.id,
+          members,
+          rates,
+          nextMembers: members.map((m, i) => ({ ...m, weight: parseWeight(draft.weights[i]) ?? 0 })),
+          nextRates: { ...rates, ...Object.fromEntries(plan.setRates.map((r) => [r.code, r.rate])) },
+          what: [plan.weights && "a nova proporção", plan.setRates.length > 0 && "a nova cotação"].filter(Boolean).join(" e "),
+        });
+        if (!ok) return setSaving(false);
+      }
+      await applySettings(project.id, plan, project.defaultCurrency);
+      toast.ok("Ajustes salvos");
+      back(`/p/${project.id}`);
+    } catch (err) {
+      toast.err((err as Error).message);
+      setSaving(false);
+    }
+  }
+
+  const saveBtn = (
+    <button className="topbar-save" onClick={save} disabled={!dirty || saving}>
+      {saving ? "Salvando…" : "Salvar"}
+    </button>
+  );
 
   return (
     <>
-      <Header title="Ajustes do projeto" onBack={() => back(`/p/${projectId}`)} />
+      <Header title="Ajustes do projeto" onBack={leave} action={saveBtn} />
       <main className="page stack">
-        <ProjectInfo key={[project.id, project.name, project.emoji, project.type, project.tripDays].join()} project={project} />
-        <Proportions
-          key={members.map((m) => m.userId + m.weight).join()}
-          projectId={projectId}
-          members={members}
-          rates={ratesOf(currencies)}
-          me={me}
-        />
-        <Currencies
-          key={currencies.map((c) => c.code + c.rate).join() + project.defaultCurrency}
-          project={project}
-          members={members}
-          currencies={currencies}
-          onChange={proj.reload}
-        />
-        <Categories projectId={projectId} categories={categories} onChange={proj.reload} />
-
+        {error && dirty && <p className="text-err small">{error}</p>}
+        <ProjectInfo draft={draft} set={set} />
+        <Proportions members={members} draft={draft} set={set} me={me} />
+        <Currencies draft={draft} set={set} />
+        <Categories draft={draft} set={set} />
         <DangerZone project={project} />
       </main>
     </>
   );
 }
 
-
-function ProjectInfo({ project }: { project: Project }) {
-  const [name, setName] = useState(project.name);
-  const [emoji, setEmoji] = useState(project.emoji);
-  const [type, setType] = useState<ProjectType>(project.type);
-  const [days, setDays] = useState(project.tripDays ? String(project.tripDays) : "");
-  // Dias só valem para viagem; vazio apaga.
-  const tripDays = type === "viagem" ? parseTripDays(days) : project.tripDays;
-  const daysInvalid = type === "viagem" && days.trim() !== "" && tripDays === null;
-  const dirty =
-    name.trim() !== project.name || emoji !== project.emoji || type !== project.type || tripDays !== project.tripDays;
-
-  async function save() {
-    try {
-      await updateProject(project.id, { name: name.trim(), emoji, type, trip_days: tripDays });
-      toast.ok("Projeto atualizado");
-    } catch (err) {
-      toast.err((err as Error).message);
-    }
-  }
-
+function ProjectInfo({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Projeto</h2>
-      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome do projeto" />
-      <EmojiPicker value={emoji} onChange={setEmoji} />
+      <input value={draft.name} onChange={(e) => set({ name: e.target.value })} maxLength={60} aria-label="Nome do projeto" />
+      <EmojiPicker value={draft.emoji} onChange={(emoji) => set({ emoji })} />
       <div className="segmented" aria-label="Tipo do projeto">
         {PROJECT_TYPES.map((t) => (
-          <button type="button" key={t.id} className={type === t.id ? "active" : ""} onClick={() => setType(t.id)}>
+          <button type="button" key={t.id} className={draft.type === t.id ? "active" : ""} onClick={() => set({ type: t.id })}>
             {t.label}
           </button>
         ))}
       </div>
-      {type === "viagem" && (
+      {draft.type === "viagem" && (
         <label className="row between gap-sm">
           <span>
             Dias de viagem
@@ -127,20 +136,14 @@ function ProjectInfo({ project }: { project: Project }) {
           </span>
           <input
             className="days-input"
-            value={days}
-            onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))}
+            value={draft.days}
+            onChange={(e) => set({ days: e.target.value.replace(/\D/g, "") })}
             inputMode="numeric"
             placeholder="—"
             maxLength={3}
             aria-label="Dias de viagem"
           />
         </label>
-      )}
-      {daysInvalid && <p className="text-err small">Informe de 1 a 366 dias.</p>}
-      {dirty && (
-        <button className="btn primary" onClick={save} disabled={!name.trim() || daysInvalid}>
-          Salvar
-        </button>
       )}
     </section>
   );
@@ -169,7 +172,7 @@ async function confirmRecalc(params: {
 }): Promise<boolean> {
   const { projectId, members, rates } = params;
   const all = await listAllForBalance(projectId);
-  if (all.expenses.length === 0) return confirm(`Salvar ${params.what}?`);
+  if (all.expenses.length === 0) return true;
   const describe = (nets: Record<string, number>) => {
     const t = suggestTransfers(nets);
     if (t.length === 0) return "quitado";
@@ -186,25 +189,13 @@ async function confirmRecalc(params: {
   );
 }
 
-function Proportions({ projectId, members, rates, me }: { projectId: string; members: Member[]; rates: Rates; me: string }) {
+function Proportions(props: { members: Member[]; draft: SettingsDraft; set: SetDraft; me: string }) {
+  const { members, draft, set, me } = props;
   const fmt = (w: number) => String(w).replace(".", ",");
-  const [inputs, setInputs] = useState(() => members.map((m) => fmt(m.weight)));
+  const inputs = draft.weights;
   const parsed = inputs.map(parseWeight);
   const valid = parsed.every((w) => w !== null) && parsed.some((w) => (w ?? 0) > 0);
-  const next = members.map((m, i) => ({ userId: m.userId, weight: parsed[i] ?? 0 }));
-  const labels = percentLabels(next);
-  const dirty = next.some((n, i) => n.weight !== members[i].weight);
-
-  async function save() {
-    try {
-      const nextMembers = members.map((m, i) => ({ ...m, weight: next[i].weight }));
-      if (!(await confirmRecalc({ projectId, members, rates, nextMembers, what: "a nova proporção" }))) return;
-      await setWeights(projectId, Object.fromEntries(next.map((n) => [n.userId, n.weight])));
-      toast.ok("Proporção salva");
-    } catch (err) {
-      toast.err((err as Error).message);
-    }
-  }
+  const labels = percentLabels(members.map((m, i) => ({ userId: m.userId, weight: parsed[i] ?? 0 })));
 
   return (
     <section className="card stack-sm">
@@ -223,7 +214,9 @@ function Proportions({ projectId, members, rates, me }: { projectId: string; mem
               className="pct-input"
               inputMode="decimal"
               value={inputs[i]}
-              onChange={(e) => setInputs(inputs.map((v, k) => (k === i ? e.target.value.replace(/[^\d.,]/g, "") : v)))}
+              onChange={(e) =>
+                set({ weights: inputs.map((v, k) => (k === i ? e.target.value.replace(/[^\d.,]/g, "") : v)) })
+              }
               aria-label={`Peso de ${m.name}`}
             />
             <span className="muted pct-label">{valid ? labels[i] : "—"}</span>
@@ -233,17 +226,11 @@ function Proportions({ projectId, members, rates, me }: { projectId: string; mem
       {members.length === 2 && (
         <div className="chips">
           {PRESETS.map(([a, b]) => (
-            <button key={`${a}-${b}`} type="button" className="chip" onClick={() => setInputs([fmt(a), fmt(b)])}>
+            <button key={`${a}-${b}`} type="button" className="chip" onClick={() => set({ weights: [fmt(a), fmt(b)] })}>
               {a} : {b}
             </button>
           ))}
         </div>
-      )}
-      {!valid && <p className="text-err small">Use números (pode ter vírgula) e pelo menos um peso maior que zero.</p>}
-      {dirty && (
-        <button className="btn primary" onClick={save} disabled={!valid}>
-          Salvar proporção
-        </button>
       )}
     </section>
   );
@@ -255,48 +242,20 @@ function sampleAmount(code: string, rate: number): number {
   return units * 10 ** currencyDecimals(code);
 }
 
-function Currencies(props: {
-  project: Project;
-  members: Member[];
-  currencies: ProjectCurrency[];
-  onChange: () => void;
-}) {
-  const { project, members, currencies } = props;
-  const extras = currencies.filter((c) => c.code !== "BRL");
-  const available = CURRENCIES.filter((c) => !currencies.some((pc) => pc.code === c.code));
-  const [newCode, setNewCode] = useState(available[0]?.code ?? "");
+function Currencies({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
+  const extras = draft.currencies;
+  const available = CURRENCIES.filter((c) => c.code !== "BRL" && !extras.some((pc) => pc.code === c.code));
+  const [newCode, setNewCode] = useState("");
   const [newRate, setNewRate] = useState("");
-  const [rates, setRates] = useState(() => Object.fromEntries(extras.map((c) => [c.code, rateToInput(c.rate)])));
-
-  async function run(fn: () => Promise<void>, ok: string) {
-    try {
-      await fn();
-      toast.ok(ok);
-      props.onChange();
-    } catch (err) {
-      toast.err((err as Error).message);
-    }
-  }
-
-  async function saveRate(code: string) {
-    const rate = parseRate(rates[code] ?? "");
-    if (!rate) return toast.err("Cotação inválida.");
-    const current = ratesOf(currencies);
-    try {
-      const ok = await confirmRecalc({
-        projectId: project.id,
-        members,
-        rates: current,
-        nextRates: { ...current, [code]: rate },
-        what: `a cotação do ${code}`,
-      });
-      if (ok) await run(() => setRate(project.id, code, rate), "Cotação salva");
-    } catch (err) {
-      toast.err((err as Error).message);
-    }
-  }
-
+  const code = available.some((c) => c.code === newCode) ? newCode : (available[0]?.code ?? "");
   const parsedNew = parseRate(newRate);
+
+  function remove(c: string) {
+    set({
+      currencies: extras.filter((x) => x.code !== c),
+      defaultCurrency: draft.defaultCurrency === c ? "BRL" : draft.defaultCurrency,
+    });
+  }
 
   return (
     <section className="card stack-sm">
@@ -314,22 +273,15 @@ function Currencies(props: {
           <span className="muted small">sempre disponível</span>
         </li>
         {extras.map((c) => {
-          const typed = parseRate(rates[c.code] ?? "");
-          const dirty = typed !== null && typed !== c.rate;
-          const sample = sampleAmount(c.code, typed ?? c.rate);
+          const typed = parseRate(c.rate);
+          const sample = typed ? sampleAmount(c.code, typed) : 0;
           return (
             <li key={c.code} className="stack-sm">
               <div className="row between">
                 <span>
                   <strong>{c.code}</strong> {currencyName(c.code)}
                 </span>
-                <button
-                  className="btn small ghost"
-                  onClick={() =>
-                    confirm(`Remover ${c.code} do projeto?`) &&
-                    run(() => removeCurrency(project.id, c.code, project.defaultCurrency === c.code), "Moeda removida")
-                  }
-                >
+                <button className="btn small ghost" onClick={() => remove(c.code)}>
                   Remover
                 </button>
               </div>
@@ -338,15 +290,16 @@ function Currencies(props: {
                 <input
                   className="grow"
                   inputMode="decimal"
-                  value={rates[c.code] ?? ""}
-                  onChange={(e) => setRates({ ...rates, [c.code]: e.target.value.replace(/[^\d.,]/g, "") })}
+                  value={c.rate}
+                  onChange={(e) =>
+                    set({
+                      currencies: extras.map((x) =>
+                        x.code === c.code ? { ...x, rate: e.target.value.replace(/[^\d.,]/g, "") } : x,
+                      ),
+                    })
+                  }
                   aria-label={`Cotação do ${c.code}`}
                 />
-                {dirty && (
-                  <button className="btn small primary" onClick={() => saveRate(c.code)}>
-                    Salvar
-                  </button>
-                )}
               </label>
               <span className="muted small">
                 {typed
@@ -358,21 +311,18 @@ function Currencies(props: {
         })}
       </ul>
 
-      {currencies.length > 1 && (
+      {extras.length > 0 && (
         <div className="field">
           <span>Moeda que vem selecionada ao lançar</span>
           <div className="segmented">
-            {currencies.map((c) => (
+            {["BRL", ...extras.map((c) => c.code)].map((c) => (
               <button
                 type="button"
-                key={c.code}
-                className={project.defaultCurrency === c.code ? "active" : ""}
-                onClick={() =>
-                  project.defaultCurrency !== c.code &&
-                  run(() => updateProject(project.id, { default_currency: c.code }), "Moeda padrão alterada")
-                }
+                key={c}
+                className={draft.defaultCurrency === c ? "active" : ""}
+                onClick={() => set({ defaultCurrency: c })}
               >
-                {c.code === "BRL" ? "R$" : c.code}
+                {c === "BRL" ? "R$" : c}
               </button>
             ))}
           </div>
@@ -380,73 +330,71 @@ function Currencies(props: {
       )}
 
       {extras.length < MAX_EXTRA_CURRENCIES && available.length > 0 && (
-        <form
-          className="stack-sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!parsedNew || !newCode) return;
-            run(() => addCurrency(project.id, newCode, parsedNew), `${newCode} adicionada`);
-          }}
-        >
+        <div className="stack-sm">
           <div className="row gap-sm">
-            <select className="currency-select" value={newCode} onChange={(e) => setNewCode(e.target.value)} aria-label="Nova moeda">
+            <select className="currency-select" value={code} onChange={(e) => setNewCode(e.target.value)} aria-label="Nova moeda">
               {available.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.code} · {c.name}
                 </option>
               ))}
             </select>
-            <input className="grow" inputMode="decimal" value={newRate} onChange={(e) => setNewRate(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Cotação em R$" aria-label="Cotação da nova moeda" />
+            <input
+              className="grow"
+              inputMode="decimal"
+              value={newRate}
+              onChange={(e) => setNewRate(e.target.value.replace(/[^\d.,]/g, ""))}
+              placeholder="Cotação em R$"
+              aria-label="Cotação da nova moeda"
+            />
           </div>
-          {parsedNew && newCode && (
+          {parsedNew && code && (
             <span className="muted small">
-              1 {newCode} = R$ {newRate} · {formatMoney(sampleAmount(newCode, parsedNew), newCode)} ={" "}
-              {formatBRL(toBrlCents(sampleAmount(newCode, parsedNew), newCode, parsedNew))}
+              1 {code} = R$ {newRate} · {formatMoney(sampleAmount(code, parsedNew), code)} ={" "}
+              {formatBRL(toBrlCents(sampleAmount(code, parsedNew), code, parsedNew))}
             </span>
           )}
-          <button className="btn primary small" disabled={!parsedNew || !newCode}>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={!parsedNew || !code}
+            onClick={() => {
+              set({ currencies: [...extras, { code, rate: newRate }] });
+              setNewRate("");
+            }}
+          >
             Adicionar moeda
           </button>
-        </form>
+        </div>
       )}
     </section>
   );
 }
 
-function Categories({ projectId, categories, onChange }: { projectId: string; categories: Category[]; onChange: () => void }) {
+let newKey = 0;
+
+function Categories({ draft, set }: { draft: SettingsDraft; set: SetDraft }) {
+  const cats = draft.categories;
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🏷️");
   const [open, setOpen] = useState<string | null>(null);
-  // Ordem local para o arrasto responder na hora; sincroniza quando o banco recarrega.
-  const [order, setOrder] = useState(categories);
-  useEffect(() => setOrder(categories), [categories]);
 
-  async function move(from: number, to: number) {
-    const next = moveItem(order, from, to);
-    setOrder(next);
-    const changed = next.map((c, i) => ({ c, pos: i + 1 })).filter(({ c, pos }) => c.position !== pos);
-    try {
-      await Promise.all(changed.map(({ c, pos }) => updateCategory(c.id, { position: pos })));
-      onChange();
-    } catch (err) {
-      toast.err((err as Error).message);
-      setOrder(categories);
-    }
+  const update = (key: string, patch: Partial<CategoryDraft>) =>
+    set({ categories: cats.map((c) => (c.key === key ? { ...c, ...patch } : c)) });
+
+  function add() {
+    if (!newName.trim()) return;
+    const cat: CategoryDraft = {
+      key: `novo-${++newKey}`,
+      id: null,
+      name: newName.trim(),
+      emoji: newEmoji || "🏷️",
+      archived: false,
+      suggestions: [],
+    };
+    set({ categories: [...cats, cat] });
+    setNewName("");
   }
-
-  async function run(fn: () => Promise<void>, ok?: string) {
-    try {
-      await fn();
-      if (ok) toast.ok(ok);
-      onChange();
-      return true;
-    } catch (err) {
-      toast.err((err as Error).message);
-      return false;
-    }
-  }
-
-  const nextPos = Math.max(0, ...categories.map((c) => c.position)) + 1;
 
   return (
     <section className="card stack-sm">
@@ -457,57 +405,85 @@ function Categories({ projectId, categories, onChange }: { projectId: string; ca
       </p>
       <SortableList
         className="cat-edit-list"
-        items={order}
-        getId={(c) => c.id}
-        onMove={move}
+        items={cats}
+        getId={(c) => c.key}
+        onMove={(from, to) => set({ categories: moveItem(cats, from, to) })}
         renderItem={(c, handle) => (
           <div className={`stack-sm ${c.archived ? "dim" : ""}`}>
             <div className="cat-edit-row">
               {handle}
-              <input key={c.emoji} className="emoji-input" defaultValue={c.emoji} aria-label="Emoji" onBlur={(e) => e.target.value.trim() && e.target.value !== c.emoji && run(() => updateCategory(c.id, { emoji: e.target.value.trim() }))} />
-              <input key={c.name} className="grow" defaultValue={c.name} aria-label="Nome da categoria" maxLength={40} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(() => updateCategory(c.id, { name: e.target.value.trim() }), "Categoria renomeada")} />
-              <button className="btn small ghost" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
-                {c.suggestions.length} {open === c.id ? "▲" : "▼"}
+              <IconInput value={c.emoji} onChange={(emoji) => update(c.key, { emoji })} label={`Ícone de ${c.name}`} />
+              <input
+                className="grow"
+                value={c.name}
+                onChange={(e) => update(c.key, { name: e.target.value })}
+                aria-label="Nome da categoria"
+                maxLength={40}
+              />
+              <button className="btn small ghost" onClick={() => setOpen(open === c.key ? null : c.key)} aria-expanded={open === c.key}>
+                {c.suggestions.length} {open === c.key ? "▲" : "▼"}
               </button>
             </div>
-            {open === c.id && (
+            {open === c.key && (
               <SuggestionsEditor
                 category={c}
-                run={run}
-                onArchive={() => run(() => updateCategory(c.id, { archived: !c.archived }))}
-                onDelete={() => confirm(`Excluir “${c.name}”?`) && run(() => deleteCategory(c.id), "Categoria excluída")}
+                onChange={(patch) => update(c.key, patch)}
+                onDelete={() => set({ categories: cats.filter((x) => x.key !== c.key) })}
               />
             )}
           </div>
         )}
       />
-      <form
-        className="row gap-sm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!newName.trim()) return;
-          if (await run(() => addCategory(projectId, newName.trim(), newEmoji.trim() || "🏷️", nextPos), "Categoria criada")) setNewName("");
-        }}
-      >
-        <input className="emoji-input" value={newEmoji} onChange={(e) => setNewEmoji(e.target.value)} aria-label="Emoji da nova categoria" />
-        <input className="grow" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nova categoria" maxLength={40} />
-        <button className="btn primary small" disabled={!newName.trim()}>
+      <div className="row gap-sm">
+        <IconInput value={newEmoji} onChange={setNewEmoji} label="Ícone da nova categoria" />
+        <input
+          className="grow"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Nova categoria"
+          maxLength={40}
+        />
+        <button type="button" className="btn ghost small" disabled={!newName.trim()} onClick={add}>
           Adicionar
         </button>
-      </form>
+      </div>
     </section>
   );
 }
 
+/** Um único ícone: um emoji (mesmo os de vários códigos, como bandeiras) ou uma letra. */
+function IconInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <input
+      className="emoji-input"
+      value={value}
+      onChange={(e) => {
+        // O que acabou de ser digitado vem depois do ícone atual: fica com o último caractere.
+        const typed = e.target.value.startsWith(value) ? e.target.value.slice(value.length) : e.target.value;
+        const g = firstGrapheme(typed);
+        onChange(g ?? "");
+      }}
+      aria-label={label}
+      autoComplete="off"
+    />
+  );
+}
+
 function SuggestionsEditor(props: {
-  category: Category;
-  run: (fn: () => Promise<void>, ok?: string) => Promise<boolean>;
-  onArchive: () => void;
+  category: CategoryDraft;
+  onChange: (patch: Partial<CategoryDraft>) => void;
   onDelete: () => void;
 }) {
-  const { category: c, run } = props;
+  const { category: c, onChange } = props;
   const [text, setText] = useState("");
-  const nextPos = Math.max(0, ...c.suggestions.map((s) => s.position)) + 1;
+
+  function add() {
+    const t = text.trim();
+    if (!t || c.suggestions.some((s) => s.text.trim() === t)) return setText("");
+    onChange({ suggestions: [...c.suggestions, { key: `novo-${++newKey}`, id: null, text: t }] });
+    setText("");
+  }
 
   return (
     <div className="suggestions-editor">
@@ -516,30 +492,34 @@ function SuggestionsEditor(props: {
       ) : (
         <div className="chips">
           {c.suggestions.map((sg) => (
-            <span key={sg.id} className="chip removable">
+            <span key={sg.key} className="chip removable">
               {sg.text}
-              <button type="button" aria-label={`Remover ${sg.text}`} onClick={() => run(() => deleteSuggestion(sg.id))}>
+              <button
+                type="button"
+                aria-label={`Remover ${sg.text}`}
+                onClick={() => onChange({ suggestions: c.suggestions.filter((s) => s.key !== sg.key) })}
+              >
                 ×
               </button>
             </span>
           ))}
         </div>
       )}
-      <form
-        className="row gap-sm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!text.trim()) return;
-          if (await run(() => addSuggestion(c.id, text.trim(), nextPos))) setText("");
-        }}
-      >
-        <input className="grow" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nova sugestão" maxLength={120} />
-        <button className="btn primary small" disabled={!text.trim()}>
+      <div className="row gap-sm">
+        <input
+          className="grow"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Nova sugestão"
+          maxLength={120}
+        />
+        <button type="button" className="btn ghost small" disabled={!text.trim()} onClick={add}>
           Adicionar
         </button>
-      </form>
+      </div>
       <div className="row gap-sm">
-        <button className="btn small ghost" onClick={props.onArchive}>
+        <button className="btn small ghost" onClick={() => onChange({ archived: !c.archived })}>
           {c.archived ? "Mostrar no lançamento" : "Ocultar do lançamento"}
         </button>
         <button className="btn small danger" onClick={props.onDelete}>
@@ -564,6 +544,7 @@ function DangerZone({ project }: { project: Project }) {
   return (
     <section className="card stack-sm">
       <h2 className="card-title">Mais opções</h2>
+      <p className="muted small">Estas ações valem na hora, sem o “Salvar”.</p>
       <button className="btn ghost" onClick={() => act(() => updateProject(project.id, { archived: !project.archived }), project.archived ? "Projeto reativado" : "Projeto arquivado")}>
         {project.archived ? "Desarquivar projeto" : "Arquivar projeto"}
       </button>

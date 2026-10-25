@@ -1064,3 +1064,22 @@ li.dragging {
   padding: 4px 0;
   text-align: left;
 }
+.topbar-save {
+  flex: none;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.topbar-save:disabled {
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: default;
+}
