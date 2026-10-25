@@ -1083,3 +1083,49 @@ li.dragging {
   color: var(--muted);
   cursor: default;
 }
+
+/* Valor e quem pagou na mesma linha; data logo abaixo */
+.amount-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.amount-row .amount-field {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.expense-form.compact .amount-row .amount-field input {
+  font-size: 38px !important;
+  width: 100% !important;
+  min-width: 0;
+}
+.payer-pick {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.payer-pick button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 108px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.payer-pick button.active {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--surface));
+  color: var(--text);
+}
+.expense-form.compact .conversion {
+  align-items: flex-start;
+}
