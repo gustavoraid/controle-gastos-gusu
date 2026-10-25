@@ -6,8 +6,10 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <g transform="rotate(-28 256 256)">
-    <path d="M244 106 A150 150 0 0 0 244 406 Z" fill="#fff"/>
-    <path d="M268 106 A150 150 0 0 1 268 406 Z" fill="#fff" fill-opacity=".62"/>
-  </g>
+  <circle cx="160" cy="150" r="66" fill="#fff"/>
+  <circle cx="352" cy="150" r="66" fill="#fff" fill-opacity=".62"/>
+  <path d="M244 132 A150 150 0 0 0 244 432 Z" fill="#fff"/>
+  <path d="M268 132 A150 150 0 0 1 268 432 Z" fill="#fff" fill-opacity=".62"/>
+  <circle cx="200" cy="270" r="16" fill="#0b5e4a"/>
+  <circle cx="312" cy="270" r="16" fill="#0b5e4a"/>
 </svg>
