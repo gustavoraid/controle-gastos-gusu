@@ -182,7 +182,7 @@ function BalanceBanner(props: {
     <section className="balance-banner">
       <span className="muted small">{props.label}</span>
       {mine.length === 0 ? (
-        <p className="balance-title">Tudo certo entre vocês ✨</p>
+        <p className="balance-title">Tudo certo entre {members.map((m) => m.name).join(" e ")} ✨</p>
       ) : (
         mine.map((t) => (
           <p key={t.from + t.to} className="balance-title">

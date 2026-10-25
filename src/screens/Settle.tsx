@@ -76,7 +76,7 @@ function SettleForm(props: { projectId: string; me: string; members: Member[]; b
     <>
       <Header title="Acertar contas" onBack={() => back(`/p/${projectId}`)} />
       <form className="page stack" onSubmit={submit}>
-        <p className="muted">Registre um Pix/transferência entre vocês. Isso zera (ou reduz) o saldo.</p>
+        <p className="muted">Registre um Pix/transferência entre {members.map((m) => m.name).join(" e ")}. Isso zera (ou reduz) o saldo.</p>
 
         <div className="settle-flow">
           {person(from, "paga")}

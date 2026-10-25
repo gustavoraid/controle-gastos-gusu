@@ -70,7 +70,7 @@ export function Projects({ me }: { me: string }) {
             {data.length === 0 && (
               <div className="empty">
                 <p className="empty-emoji">👋</p>
-                <p>Crie um projeto (Casa, Viagem…). Ele já nasce com vocês dois.</p>
+                <p>Crie um projeto (Casa, Viagem…). Ele já nasce com os dois.</p>
               </div>
             )}
 
