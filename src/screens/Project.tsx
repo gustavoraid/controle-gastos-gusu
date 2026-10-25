@@ -12,14 +12,18 @@ import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
 import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
-import { setLastProject } from "@/lib/storage";
+import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 
 // key: ordem dentro do dia (maior = mais acima). Despesa usa sort_key; acerto, o instante em que foi criado.
 type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; date: string; key: number; s: Settlement };
 
 export function ProjectScreen({ id, me }: { id: string; me: string }) {
-  const [month, setMonth] = useState(() => todayISO().slice(0, 7));
+  const [month, setMonthState] = useState(() => getViewMonth(id) ?? todayISO().slice(0, 7));
+  const setMonth = (m: string) => {
+    setMonthState(m);
+    setViewMonth(id, m);
+  };
   const [tab, setTab] = useState<"lista" | "resumo">("lista");
   const [reordering, setReordering] = useState(false);
   const reloadActivity = useRef<() => void>(undefined);
