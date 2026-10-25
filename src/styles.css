@@ -954,10 +954,24 @@ li.dragging {
 .tabs-row .segmented {
   flex: 1;
 }
-.reorder-btn {
-  font-size: 22px;
-  background: var(--surface-2);
-  border-radius: 12px;
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.reorder-day {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+.reorder-day:active {
+  color: var(--text);
 }
 .activity.reordering {
   padding-bottom: calc(80px + var(--safe-bottom));
@@ -1049,4 +1063,23 @@ li.dragging {
 .btn.link.trip-days-hint {
   padding: 4px 0;
   text-align: left;
+}
+.topbar-save {
+  flex: none;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.topbar-save:disabled {
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: default;
 }

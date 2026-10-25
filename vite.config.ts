@@ -7,4 +7,13 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  build: {
+    rollupOptions: {
+      // nova-despesa.html: mesma app, com manifesto/ícone próprios para o atalho "+ Casa".
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        casa: fileURLToPath(new URL("./nova-despesa.html", import.meta.url)),
+      },
+    },
+  },
 });
