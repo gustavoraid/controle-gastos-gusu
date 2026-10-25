@@ -10,6 +10,7 @@ import { dayLabel, monthLabel, monthRange, navigableMonths, shiftMonth, shortDay
 import { formatMoney } from "@/lib/currency";
 import { formatBRL } from "@/lib/money";
 import { expenseShares, percentLabels } from "@/lib/split";
+import { swipeStep } from "@/lib/swipe";
 import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
 import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
@@ -27,6 +28,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   const [tab, setTab] = useState<"lista" | "resumo">("lista");
   const [reordering, setReordering] = useState(false);
   const reloadActivity = useRef<() => void>(undefined);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const proj = useProject(id, () => reloadActivity.current?.());
   // Viagem mostra tudo de uma vez (sem navegação por mês); os outros tipos, mês a mês.
   const type = proj.data?.project.type;
@@ -87,7 +89,23 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   return (
     <>
       <Header title={`${project.emoji} ${project.name}`} onBack={() => back("/")} action={settingsBtn} />
-      <main className="page with-fab">
+      <main
+        className="page with-fab"
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          touchStart.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+        }}
+        onTouchEnd={(e) => {
+          const start = touchStart.current;
+          touchStart.current = null;
+          // Arrastar para o lado troca o mês (onde há navegação por mês e fora do modo reordenar).
+          if (!start || isTrip || reordering) return;
+          const t = e.changedTouches[0];
+          const step = swipeStep(start, { x: t.clientX, y: t.clientY }, window.innerWidth);
+          const target = step === 1 ? nextMonth : step === -1 ? prevMonth : null;
+          if (target) setMonth(target);
+        }}
+      >
 
         {!isTrip && (
         <nav className="month-nav">
