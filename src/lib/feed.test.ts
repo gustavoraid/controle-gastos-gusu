@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { badgeLabel, buildFeed, feedChanges, feedDay, feedTitle, isUnseen, type LogRow } from "./feed";
 
 const G = "g", S = "s";
-const name = (uid: string) => (uid === G ? "Gustavo" : "Suellen");
+const name = (uid: string) => (uid === G ? "Gu" : "Su");
 // Intl separa símbolo e número com espaço não separável.
 const plain = (xs: string[]) => xs.map((x) => x.replace(/\u00a0/g, " "));
 let seq = 0;
@@ -52,23 +52,21 @@ describe("buildFeed", () => {
 
 describe("feedTitle", () => {
   const e = exp("2026-10-20T10:00:00Z", S, { summary: { ...exp("", S).summary, description: "Entrada convento" } });
-  it("despesa da outra pessoa e minha", () => {
-    expect(feedTitle(e, G, name)).toBe("Suellen lançou Entrada convento");
-    expect(feedTitle(e, S, name)).toBe("Você lançou Entrada convento");
+  it("sempre pelo nome curto, nunca 'você'", () => {
+    expect(feedTitle(e, name)).toBe("Su lançou Entrada convento");
+    expect(feedTitle(exp("2026-10-20T10:00:00Z", G), name)).toBe("Gu lançou Jantar");
   });
   it("edição e exclusão", () => {
-    expect(feedTitle({ ...e, action: "updated" }, G, name)).toBe("Suellen editou Entrada convento");
-    expect(feedTitle({ ...e, action: "deleted" }, G, name)).toBe("Suellen apagou Entrada convento");
+    expect(feedTitle({ ...e, action: "updated" }, name)).toBe("Su editou Entrada convento");
+    expect(feedTitle({ ...e, action: "deleted" }, name)).toBe("Su apagou Entrada convento");
   });
   it("acerto", () => {
     const a = set("2026-10-20T10:00:00Z", S, S, G);
-    expect(feedTitle(a, G, name)).toBe("Suellen registrou um pagamento para você");
-    expect(feedTitle({ ...a, action: "deleted" }, S, name)).toBe("Você apagou um pagamento para Gustavo");
+    expect(feedTitle(a, name)).toBe("Su registrou um pagamento para Gu");
+    expect(feedTitle({ ...a, action: "deleted" }, name)).toBe("Su apagou um pagamento para Gu");
   });
   it("acerto registrado por quem recebeu", () => {
-    const a = set("2026-10-20T10:00:00Z", G, S, G);
-    expect(feedTitle(a, S, name)).toBe("Gustavo registrou um pagamento de você para Gustavo");
-    expect(feedTitle(a, G, name)).toBe("Você registrou um pagamento de Suellen para você");
+    expect(feedTitle(set("2026-10-20T10:00:00Z", G, S, G), name)).toBe("Gu registrou um pagamento de Su para Gu");
   });
 });
 
@@ -83,9 +81,9 @@ describe("feedChanges", () => {
         spent_on: ["2026-10-05", "2026-10-06"],
       },
     });
-    expect(plain(feedChanges(u, G, name))).toEqual([
+    expect(plain(feedChanges(u, name))).toEqual([
       "valor PEN 40,00 → PEN 45,00",
-      "pago por você → Suellen",
+      "pago por Gu → Su",
       "categoria Comida → Passeios",
       "data 05/10 → 06/10",
     ]);
@@ -95,10 +93,10 @@ describe("feedChanges", () => {
       action: "updated",
       changes: { amount_cents: [5000, 7000], settled_on: ["2026-10-05", "2026-10-07"], direction: [[S, G], [G, S]] },
     });
-    expect(plain(feedChanges(u, G, name))).toEqual(["valor R$ 50,00 → R$ 70,00", "data 05/10 → 07/10", "inverteu quem pagou e quem recebeu"]);
+    expect(plain(feedChanges(u, name))).toEqual(["valor R$ 50,00 → R$ 70,00", "data 05/10 → 07/10", "inverteu quem pagou e quem recebeu"]);
   });
   it("criação e exclusão não têm detalhes", () => {
-    expect(feedChanges(exp("2026-10-20T10:00:00Z", G), G, name)).toEqual([]);
+    expect(feedChanges(exp("2026-10-20T10:00:00Z", G), name)).toEqual([]);
   });
 });
 

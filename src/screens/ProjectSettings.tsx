@@ -32,7 +32,7 @@ import { PROJECT_TYPES, type Member, type Project } from "@/lib/types";
 
 type SetDraft = (patch: Partial<SettingsDraft>) => void;
 
-export function ProjectSettings({ projectId, me }: { projectId: string; me: string }) {
+export function ProjectSettings({ projectId }: { projectId: string; me: string }) {
   const proj = useProject(projectId);
   if (proj.error) {
     return (
@@ -45,14 +45,14 @@ export function ProjectSettings({ projectId, me }: { projectId: string; me: stri
     );
   }
   if (!proj.data) return <Loading />;
-  return <SettingsForm key={projectId} initial={proj.data} me={me} />;
+  return <SettingsForm key={projectId} initial={proj.data} />;
 }
 
 /**
  * Tudo o que se edita aqui fica num rascunho até o "Salvar" do topo. A base é o
  * que veio do banco ao abrir a tela (o tempo real não mexe no que está sendo editado).
  */
-function SettingsForm({ initial, me }: { initial: SettingsBase; me: string }) {
+function SettingsForm({ initial }: { initial: SettingsBase }) {
   const [base] = useState(initial);
   const [draft, setDraftState] = useState(() => draftFrom(initial));
   const [saving, setSaving] = useState(false);
@@ -106,7 +106,7 @@ function SettingsForm({ initial, me }: { initial: SettingsBase; me: string }) {
       <main className="page stack">
         {error && dirty && <p className="text-err small">{error}</p>}
         <ProjectInfo draft={draft} set={set} />
-        <Proportions members={members} draft={draft} set={set} me={me} />
+        <Proportions members={members} draft={draft} set={set} />
         <Currencies draft={draft} set={set} />
         <Categories draft={draft} set={set} />
         <DangerZone project={project} />
@@ -189,8 +189,8 @@ async function confirmRecalc(params: {
   );
 }
 
-function Proportions(props: { members: Member[]; draft: SettingsDraft; set: SetDraft; me: string }) {
-  const { members, draft, set, me } = props;
+function Proportions(props: { members: Member[]; draft: SettingsDraft; set: SetDraft }) {
+  const { members, draft, set } = props;
   const fmt = (w: number) => String(w).replace(".", ",");
   const inputs = draft.weights;
   const parsed = inputs.map(parseWeight);
@@ -207,7 +207,7 @@ function Proportions(props: { members: Member[]; draft: SettingsDraft; set: SetD
       {members.map((m, i) => (
         <label key={m.userId} className="row between">
           <span className="row gap-sm">
-            <Avatar name={m.name} size={28} /> {m.userId === me ? `${m.name} (você)` : m.name}
+            <Avatar name={m.name} size={28} /> {m.name}
           </span>
           <span className="row gap-sm">
             <input

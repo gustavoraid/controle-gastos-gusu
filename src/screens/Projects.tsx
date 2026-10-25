@@ -128,7 +128,7 @@ export function BalanceLine({ cents, big }: { cents: number; big?: boolean }) {
   if (cents === 0) return <span className={`balance muted ${big ? "big" : ""}`}>quitado</span>;
   return (
     <span className={`balance ${big ? "big" : ""}`}>
-      <span className="small muted">{cents > 0 ? "a receber" : "você deve"}</span>
+      <span className="small muted">{cents > 0 ? "a receber" : "a pagar"}</span>
       <Money cents={Math.abs(cents)} tone={cents > 0 ? "pos" : "neg"} />
     </span>
   );
