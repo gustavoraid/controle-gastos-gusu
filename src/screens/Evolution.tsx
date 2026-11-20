@@ -71,26 +71,71 @@ export function Evolution(props: {
 
   const periodLabel = period === LAST_12 ? "Últimos 12 meses" : period;
   const picker = (
-    <select
-      className="evo-period"
-      value={period}
-      aria-label="Período"
-      onChange={(e) => {
-        setPeriod(e.target.value);
-        setPicked(null);
-      }}
-    >
-      <option value={LAST_12}>Últimos 12 meses</option>
-      {props.years.map((y) => (
-        <option key={y} value={y}>
-          {y}
-        </option>
-      ))}
-    </select>
+    <label className="evo-period-field">
+      <span className="muted small">Período</span>
+      <select
+        className="evo-period"
+        value={period}
+        onChange={(e) => {
+          setPeriod(e.target.value);
+          setPicked(null);
+        }}
+      >
+        <option value={LAST_12}>Últimos 12 meses</option>
+        {props.years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 
   if (load.error) return <ErrorBox message={load.error} onRetry={load.reload} />;
   if (!expenses || !view) return <Loading />;
+
+  // Seleção de categoria, sempre abaixo do período: "Todas" (visão geral) + as do
+  // período, da maior para a menor.
+  const inPeriod = new Set(months);
+  const sums = new Map<string, number>();
+  for (const e of expenses) {
+    if (!inPeriod.has(e.spentOn.slice(0, 7))) continue;
+    const k = e.categoryId ?? "";
+    sums.set(k, (sums.get(k) ?? 0) + e.amountCents);
+  }
+  if (catId !== null && !sums.has(catId)) sums.set(catId, 0);
+  const chipIds = [...sums.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const controls = (
+    <>
+      {picker}
+      <div className="evo-chips" role="tablist" aria-label="Categoria" ref={chipsRef}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={catId === null}
+          className={`chip all${catId === null ? " active" : ""}`}
+          onClick={() => setCatId(null)}
+        >
+          Todas
+        </button>
+        {chipIds.map((id) => {
+          const k = cats.get(id);
+          return (
+            <button
+              key={id || "none"}
+              type="button"
+              role="tab"
+              aria-selected={id === catId}
+              className={`chip${id === catId ? " active" : ""}`}
+              onClick={() => setCatId(id)}
+            >
+              {k?.emoji ?? "📦"} {k?.name ?? "Sem categoria"}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
 
   const sel = months.indexOf(month);
   const inProgress = month === current;
@@ -100,39 +145,9 @@ export function Evolution(props: {
     const values = categoryMonthly(expenses, months, catId);
     const avg = averageAt(values, view.closed);
     const list = expenses.filter((e) => (e.categoryId ?? "") === catId && e.spentOn.startsWith(month));
-    // Troca de categoria sem voltar: chips com as categorias do período, da maior para a menor.
-    const inPeriod = new Set(months);
-    const sums = new Map<string, number>();
-    for (const e of expenses) {
-      if (!inPeriod.has(e.spentOn.slice(0, 7))) continue;
-      const k = e.categoryId ?? "";
-      sums.set(k, (sums.get(k) ?? 0) + e.amountCents);
-    }
-    if (!sums.has(catId)) sums.set(catId, 0);
-    const chips = [...sums.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
     return (
       <div className="stack">
-        {picker}
-        <div className="evo-chips" role="tablist" aria-label="Categoria" ref={chipsRef}>
-          <button type="button" className="chip back" onClick={() => setCatId(null)}>
-            ‹ Todas
-          </button>
-          {chips.map((id) => {
-            const k = cats.get(id);
-            return (
-              <button
-                key={id || "none"}
-                type="button"
-                role="tab"
-                aria-selected={id === catId}
-                className={`chip${id === catId ? " active" : ""}`}
-                onClick={() => setCatId(id)}
-              >
-                {k?.emoji ?? "📦"} {k?.name ?? "Sem categoria"}
-              </button>
-            );
-          })}
-        </div>
+        {controls}
         <section className="card">
           <h2 className="card-title">
             {c?.emoji ?? "📦"} {c?.name ?? "Sem categoria"}
@@ -187,7 +202,7 @@ export function Evolution(props: {
 
   return (
     <div className="stack">
-      {picker}
+      {controls}
       <section className="card">
         <h2 className="card-title">{periodLabel}</h2>
         <div className="evo-legend small">

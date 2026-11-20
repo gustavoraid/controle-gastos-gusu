@@ -1327,10 +1327,15 @@ li.dragging {
   flex: none;
   white-space: nowrap;
 }
-/* "‹ Todas" fica preso à esquerda enquanto a faixa de categorias rola */
-.evo-chips .chip.back {
+/* "Todas" fica preso à esquerda enquanto a faixa de categorias rola */
+.evo-chips .chip.all {
   position: sticky;
   left: 0;
   z-index: 1;
   box-shadow: 8px 0 8px -4px var(--bg);
+}
+.evo-period-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
