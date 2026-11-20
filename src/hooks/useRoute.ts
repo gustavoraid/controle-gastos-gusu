@@ -15,13 +15,26 @@ export function useRoute() {
   };
 }
 
+/**
+ * Posição da entrada atual dentro da navegação do app, guardada no `history.state`.
+ * 0 = primeira tela aberta (ou entrada de fora do app): não há para onde voltar.
+ * Não dá para usar `history.length`: ele conta também as entradas "para frente"
+ * (depois de um voltar) e as de antes do app, e aí `history.back()` não faz nada.
+ */
+function depth(): number {
+  const s = window.history.state as { depth?: unknown } | null;
+  return s && typeof s.depth === "number" ? s.depth : 0;
+}
+
 export function go(path: string, opts: { replace?: boolean } = {}) {
-  const target = `#${path}`;
-  if (opts.replace) window.location.replace(target);
+  const d = depth();
+  // Navegação só de hash é síncrona: logo depois, a entrada atual já é a nova.
+  if (opts.replace) window.location.replace(`#${path}`);
   else window.location.hash = path;
+  window.history.replaceState({ depth: opts.replace ? d : d + 1 }, "");
 }
 
 export function back(fallback: string) {
-  if (window.history.length > 1) window.history.back();
+  if (depth() > 0) window.history.back();
   else go(fallback, { replace: true });
 }
