@@ -19,6 +19,40 @@ export function setLastProject(id: string) {
   }
 }
 
+const LAST_PLACE = "gc:ultimoLugar";
+
+/**
+ * Último projeto ou lista aberto ("/p/:id" ou "/l/:id"): é para onde o app vai ao
+ * abrir. Antes das listas só existia o último projeto — vale como reserva.
+ */
+export function getLastPlace(): string | null {
+  try {
+    const place = localStorage.getItem(LAST_PLACE);
+    if (place) return place;
+  } catch {
+    /* ignora */
+  }
+  const p = getLastProject();
+  return p ? `/p/${p}` : null;
+}
+
+export function setLastPlace(path: string) {
+  try {
+    localStorage.setItem(LAST_PLACE, path);
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Lista apagada (por qualquer um): o app não deve tentar abri-la de novo. */
+export function forgetLastPlace(path: string) {
+  try {
+    if (localStorage.getItem(LAST_PLACE) === path) localStorage.removeItem(LAST_PLACE);
+  } catch {
+    /* ignora */
+  }
+}
+
 const FEED_SEEN = "gc:atividadesVistas";
 
 /** Momento (ms) da última visita à tela Atividades neste aparelho. */

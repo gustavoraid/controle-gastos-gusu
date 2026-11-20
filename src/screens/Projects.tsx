@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ErrorBox, Header, Loading } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { go } from "@/hooks/useRoute";
-import { countUnseenActivity, listProjects, listSpending, signOut } from "@/lib/api";
+import { countUnseenActivity, listLists, listProjects, listSpending, signOut, type ListSummary } from "@/lib/api";
 import { todayISO } from "@/lib/dates";
 import { monthlyAverage } from "@/lib/evolution";
 import { formatBRL } from "@/lib/money";
@@ -15,14 +15,19 @@ export function Projects({ me }: { me: string }) {
   const { data, error, reload } = useLoad(() => listProjects(me), [me]);
   // Médias vêm à parte: a lista aparece já, e o número entra quando chegar.
   const spending = useLoad(() => listSpending(), [me]);
+  const lists = useLoad(() => listLists(), [me]);
   const [showArchived, setShowArchived] = useState(false);
   const unseen = useLoad(() => countUnseenActivity(me, getFeedSeen()), [me]);
   // Voltou para o app (estava em segundo plano): atualiza o contador do sino.
   useEffect(() => {
-    const onVisible = () => document.visibilityState === "visible" && unseen.reload();
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      unseen.reload();
+      lists.reload();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [unseen.reload]);
+  }, [unseen.reload, lists.reload]);
   const badge = badgeLabel(unseen.data ?? 0);
 
   const menu = (
@@ -72,6 +77,7 @@ export function Projects({ me }: { me: string }) {
               </div>
             )}
 
+            {data.length > 0 && <h2 className="section-title">Projetos</h2>}
             <ul className="list">
               {active.map((p) => (
                 <ProjectRow key={p.id} p={p} me={me} spending={spending.data?.get(p.id) ?? (spending.data ? [] : null)} />
@@ -95,6 +101,22 @@ export function Projects({ me }: { me: string }) {
 
             <button className="btn primary big" onClick={() => go("/novo")}>
               + Novo projeto
+            </button>
+
+            <h2 className="section-title">Listas</h2>
+            {lists.error && <ErrorBox message={lists.error} onRetry={lists.reload} />}
+            {lists.data && lists.data.length > 0 && (
+              <ul className="list">
+                {lists.data.map((l) => (
+                  <ListRow key={l.id} l={l} />
+                ))}
+              </ul>
+            )}
+            {lists.data && lists.data.length === 0 && (
+              <p className="muted small">Compras, tarefas de casa… cada lista é dos dois, com ordem de prioridade.</p>
+            )}
+            <button className="btn big" onClick={() => go("/nova-lista")}>
+              + Nova lista
             </button>
           </>
         )}
@@ -156,5 +178,28 @@ function SpendStat({ p, rows }: { p: ProjectSummary; rows: { spentOn: string; am
       <span className="money">{formatBRL(avg)}</span>
       <span className="muted small">média/mês</span>
     </span>
+  );
+}
+
+function ListRow({ l }: { l: ListSummary }) {
+  return (
+    <li>
+      <button className="list-item" onClick={() => go(`/l/${l.id}`)}>
+        <span className="cat-badge big">{l.emoji}</span>
+        <span className="grow min0">
+          <strong className="ellipsis">{l.name}</strong>
+        </span>
+        <span className="spend-stat">
+          {l.pending > 0 ? (
+            <>
+              <span className="money">{l.pending}</span>
+              <span className="muted small">pendente{l.pending > 1 ? "s" : ""}</span>
+            </>
+          ) : (
+            <span className="muted small">tudo feito</span>
+          )}
+        </span>
+      </button>
+    </li>
   );
 }

@@ -1,6 +1,9 @@
 /** Ícones sugeridos para projeto; qualquer outro emoji pode ser digitado. */
 export const PROJECT_EMOJIS = ["🏠", "💰", "✈️", "🏖️", "🏔️", "🛒", "🚗", "👶", "🐶", "🎉", "💍", "🎄", "📚", "🌎"];
 
+/** Sugestões de ícone para listas (compras, tarefas…). */
+export const LIST_EMOJIS = ["🛒", "🧹", "📝", "✅", "🎁", "💊", "🧺", "🔧", "🌱", "🐾"];
+
 /**
  * Primeiro caractere visível do que foi digitado (um emoji pode ter vários
  * códigos: bandeiras, tons de pele, 👨‍👩‍👧). Vazio ou só espaços → null.

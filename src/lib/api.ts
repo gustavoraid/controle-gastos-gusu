@@ -1,4 +1,5 @@
 import { toBrlCents } from "@/lib/currency";
+import { pendingCount, type ListItem, type ListOp } from "@/lib/lists";
 import { shortName } from "@/lib/people";
 import { supabase } from "@/lib/supabase";
 import type { LogRow } from "@/lib/feed";
@@ -529,4 +530,121 @@ export function subscribeProject(projectId: string, onChange: () => void) {
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+// ---------------------------------------------------------------- listas
+
+/** Falha de rede (sem sinal, timeout): a operação fica na fila e é tentada de novo. */
+export class NetworkError extends Error {}
+
+function checkList<T>(res: { data: T | null; error: { message: string; code?: string } | null; status?: number }): T {
+  if (res.error) {
+    const m = res.error.message ?? "";
+    if (!res.status || /fetch|network|load failed|timeout|abort/i.test(m)) throw new NetworkError(m);
+    throw new Error(translateError(m));
+  }
+  return res.data as T;
+}
+
+export interface ListSummary {
+  id: string;
+  name: string;
+  emoji: string;
+  createdAt: string;
+  pending: number;
+}
+
+const mapListItem = (r: any): ListItem => ({
+  id: r.id,
+  listId: r.list_id,
+  text: r.text,
+  sortKey: Number(r.sort_key),
+  doneAt: r.done_at,
+  doneBy: r.done_by,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+});
+
+/** Listas para a tela inicial, com quantos itens faltam (na ordem de criação). */
+export async function listLists(): Promise<ListSummary[]> {
+  const lists = check<any[]>(await supabase.from("lists").select("id, name, emoji, created_at").order("created_at"));
+  const items = await fetchAll<any>((from, to) =>
+    supabase.from("list_items").select("id, list_id").is("done_at", null).order("id").range(from, to),
+  );
+  const count = new Map<string, number>();
+  for (const i of items) count.set(i.list_id, (count.get(i.list_id) ?? 0) + 1);
+  return lists.map((l) => ({ id: l.id, name: l.name, emoji: l.emoji, createdAt: l.created_at, pending: count.get(l.id) ?? 0 }));
+}
+
+export async function getList(id: string): Promise<{ list: ListSummary; items: ListItem[] }> {
+  const l = check<any>(await supabase.from("lists").select("id, name, emoji, created_at").eq("id", id).single());
+  const items = (
+    await fetchAll<any>((from, to) => supabase.from("list_items").select("*").eq("list_id", id).order("id").range(from, to))
+  ).map(mapListItem);
+  return {
+    list: { id: l.id, name: l.name, emoji: l.emoji, createdAt: l.created_at, pending: pendingCount(items) },
+    items,
+  };
+}
+
+export async function createList(name: string, emoji: string): Promise<string> {
+  const id = newId();
+  check(await supabase.from("lists").insert({ id, name, emoji }));
+  return id;
+}
+
+export async function updateList(id: string, patch: { name: string; emoji: string }) {
+  check(await supabase.from("lists").update(patch).eq("id", id));
+}
+
+export async function deleteList(id: string) {
+  check(await supabase.from("lists").delete().eq("id", id));
+}
+
+/**
+ * Grava uma operação da fila. Todas são idempotentes: o insert reconhece o ID
+ * repetido, update e delete por ID dão o mesmo resultado se repetidos.
+ */
+export async function applyListOp(op: ListOp) {
+  if (op.kind === "add") {
+    const i = op.item;
+    const res = await supabase
+      .from("list_items")
+      .insert({ id: i.id, list_id: i.listId, text: i.text, sort_key: i.sortKey, done_at: i.doneAt, done_by: i.doneBy });
+    if (res.error?.code === "23505" && res.error.message.includes("list_items_pkey")) return;
+    checkList(res);
+  } else if (op.kind === "update") {
+    const p = op.patch;
+    const row: Record<string, unknown> = {};
+    if (p.text !== undefined) row.text = p.text;
+    if (p.sortKey !== undefined) row.sort_key = p.sortKey;
+    if (p.doneAt !== undefined) row.done_at = p.doneAt;
+    if (p.doneBy !== undefined) row.done_by = p.doneBy;
+    checkList(await supabase.from("list_items").update(row).eq("id", op.id));
+  } else {
+    checkList(await supabase.from("list_items").delete().eq("id", op.id));
+  }
+}
+
+/**
+ * Tempo real da lista. Exclusão não passa pelo filtro por list_id (o evento só
+ * traz o id), então escuta exclusões sem filtro e recarrega.
+ */
+export function subscribeList(listId: string, onChange: () => void) {
+  const channel = supabase
+    .channel(`list-${listId}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "list_items", filter: `list_id=eq.${listId}` }, onChange)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "list_items", filter: `list_id=eq.${listId}` }, onChange)
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "list_items" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "lists", filter: `id=eq.${listId}` }, onChange)
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/** Nome curto (Gu / Su) de cada pessoa do app, por id. */
+export async function listPeople(): Promise<Map<string, string>> {
+  const rows = check<any[]>(await supabase.from("profiles").select("id, display_name"));
+  return new Map(rows.map((r) => [r.id as string, shortName(r.display_name)]));
 }

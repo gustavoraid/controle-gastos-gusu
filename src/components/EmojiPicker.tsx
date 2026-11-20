@@ -3,8 +3,16 @@ import { Chip } from "@/components/ui";
 import { PROJECT_EMOJIS, firstGrapheme } from "@/lib/emoji";
 
 /** Ícones sugeridos + campo para digitar qualquer emoji pelo teclado do celular. */
-export function EmojiPicker({ value, onChange }: { value: string; onChange: (emoji: string) => void }) {
-  const custom = !PROJECT_EMOJIS.includes(value);
+export function EmojiPicker({
+  value,
+  onChange,
+  options = PROJECT_EMOJIS,
+}: {
+  value: string;
+  onChange: (emoji: string) => void;
+  options?: string[];
+}) {
+  const custom = !options.includes(value);
   const [typing, setTyping] = useState("");
 
   return (
@@ -15,7 +23,7 @@ export function EmojiPicker({ value, onChange }: { value: string; onChange: (emo
             <span className="emoji-lg">{value}</span>
           </Chip>
         )}
-        {PROJECT_EMOJIS.map((e) => (
+        {options.map((e) => (
           <Chip key={e} active={value === e} onClick={() => onChange(e)}>
             <span className="emoji-lg">{e}</span>
           </Chip>

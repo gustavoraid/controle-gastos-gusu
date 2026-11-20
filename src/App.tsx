@@ -8,6 +8,8 @@ import { supabaseConfigured } from "@/lib/supabase";
 import { getLastProject } from "@/lib/storage";
 import { ExpenseForm } from "@/screens/ExpenseForm";
 import { Activity } from "@/screens/Activity";
+import { ListScreen } from "@/screens/List";
+import { ListSettings } from "@/screens/ListSettings";
 import { Login } from "@/screens/Login";
 import { NewProject } from "@/screens/NewProject";
 import { ProjectScreen } from "@/screens/Project";
@@ -64,6 +66,11 @@ function Routes() {
   const [a, b, c] = parts;
 
   if (a === "novo") return <NewProject me={me} />;
+  if (a === "nova-lista") return <ListSettings />;
+  if (a === "l" && b) {
+    if (c === "config") return <ListSettings id={b} />;
+    return <ListScreen id={b} me={me} />;
+  }
   if (a === "atividades") return <Activity me={me} />;
   if (a === "p" && b) {
     if (c === "add") return <ExpenseForm projectId={b} expenseId={params.get("e")} me={me} />;
