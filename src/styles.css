@@ -1396,12 +1396,26 @@ li.dragging {
   line-height: 1;
 }
 .sync-note {
+  position: fixed;
+  top: calc(var(--safe-top) + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
   margin: 0;
+  max-width: calc(100vw - 32px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 15%);
   color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 .sync-note.offline {
   color: var(--neg);
-  font-weight: 600;
 }
 .item-row {
   gap: 6px;
