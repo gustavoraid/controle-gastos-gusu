@@ -112,17 +112,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         }}
       >
 
-        {!isTrip && (
-        <nav className="month-nav">
-          <button className="icon-btn" aria-label="Mês anterior" disabled={!prevMonth} onClick={() => prevMonth && setMonth(prevMonth)}>
-            ‹
-          </button>
-          <strong>{monthLabel(month)}</strong>
-          <button className="icon-btn" aria-label="Próximo mês" disabled={!nextMonth} onClick={() => nextMonth && setMonth(nextMonth)}>
-            ›
-          </button>
-        </nav>
-        )}
 
         <div className="tabs-row">
           <div className="segmented" role="tablist">
@@ -143,6 +132,21 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           </div>
         </div>
 
+        {/* Saldo é do projeto todo: fica acima do mês. */}
+        {tab === "lista" && isHome && (
+          <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
+        )}
+        {!isTrip && (
+        <nav className="month-nav">
+          <button className="icon-btn" aria-label="Mês anterior" disabled={!prevMonth} onClick={() => prevMonth && setMonth(prevMonth)}>
+            ‹
+          </button>
+          <strong>{monthLabel(month)}</strong>
+          <button className="icon-btn" aria-label="Próximo mês" disabled={!nextMonth} onClick={() => nextMonth && setMonth(nextMonth)}>
+            ›
+          </button>
+        </nav>
+        )}
         {tab === "evolucao" && isHome && (
           <Evolution
             projectId={id}
@@ -155,9 +159,6 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         )}
         {tab !== "evolucao" && activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
         {tab !== "evolucao" && !activity.data && !activity.error && <Loading />}
-        {activity.data && tab === "lista" && isHome && (
-          <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
-        )}
         {activity.data && tab === "lista" && (
           <ActivityList
             me={me}
