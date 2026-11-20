@@ -24,6 +24,16 @@ export function ListScreen({ id, me }: { id: string; me: string }) {
   const [showDone, setShowDone] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // "Sincronizando…" só se a gravação demorar: as rápidas (quase todas) não piscam aviso.
+  const [slowSync, setSlowSync] = useState(false);
+  useEffect(() => {
+    if (sync.pending === 0) {
+      setSlowSync(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowSync(true), 1000);
+    return () => clearTimeout(t);
+  }, [sync.pending > 0]);
 
   useEffect(() => setLastPlace(`/l/${id}`), [id]);
   useEffect(() => setRejectedHandler((msg) => toast.err(`Não foi possível salvar: ${msg}`)), []);
@@ -128,8 +138,9 @@ export function ListScreen({ id, me }: { id: string; me: string }) {
     <>
       <Header title={`${list.emoji} ${list.name}`} onBack={() => back("/")} action={settings} />
       <main className="page list-page">
-        {sync.pending > 0 && (
-          <p className={`sync-note small${sync.offline ? " offline" : ""}`}>
+        {/* Etiqueta flutuante: não ocupa espaço, então não empurra a lista. */}
+        {sync.pending > 0 && (sync.offline || slowSync) && (
+          <p className={`sync-note small${sync.offline ? " offline" : ""}`} role="status">
             {sync.offline
               ? `Sem conexão · ${sync.pending} alteraç${sync.pending > 1 ? "ões guardadas" : "ão guardada"} no aparelho`
               : "Sincronizando…"}
