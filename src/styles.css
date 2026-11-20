@@ -1147,3 +1147,145 @@ li.dragging {
 .expense-form.compact .conversion {
   align-items: flex-start;
 }
+
+/* ------------------------------------------------------------ evolução (Casa) */
+
+.evo-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 10px;
+  overflow: visible;
+}
+.evo-chart g {
+  cursor: pointer;
+}
+.evo-chart .rec {
+  fill: var(--brand);
+  opacity: 0.45;
+}
+.evo-chart .non {
+  fill: var(--neg);
+  opacity: 0.4;
+}
+.evo-chart g.on .rec,
+.evo-chart g.on .non {
+  opacity: 1;
+}
+.evo-chart .lbl {
+  font-size: 10px;
+  fill: var(--muted);
+}
+.evo-chart g.on .lbl {
+  fill: var(--text);
+  font-weight: 700;
+}
+.evo-chart .val {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--text);
+}
+.evo-chart .avg {
+  stroke: var(--text);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}
+.evo-legend {
+  display: flex;
+  gap: 10px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.evo-legend .sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.evo-legend .sw.rec {
+  background: var(--brand);
+}
+.evo-legend .sw.non {
+  background: var(--neg);
+}
+.evo-note {
+  margin: 6px 0 0;
+}
+.evo-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.evo-compare .money {
+  font-size: 17px;
+}
+.evo-compare.big {
+  margin-top: 6px;
+}
+.evo-compare.big .money {
+  font-size: 26px;
+}
+.evo-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.evo-delta {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.evo-delta.up {
+  color: var(--neg);
+}
+.evo-delta.down {
+  color: var(--pos);
+}
+.evo-cats .list-item,
+.evo-list .list-item {
+  gap: 10px;
+}
+.evo-spark {
+  flex: none;
+}
+.evo-spark rect {
+  fill: var(--muted);
+  opacity: 0.35;
+}
+.evo-spark rect.on {
+  fill: var(--brand);
+  opacity: 1;
+}
+.evo-cat-value {
+  min-width: 84px;
+  text-align: right;
+}
+.evo-back {
+  align-self: flex-start;
+  padding-left: 0;
+}
+.evo-legend {
+  margin-top: 4px;
+}
+.evo-legend .sw.avg {
+  height: 0;
+  border-top: 2px dashed var(--muted);
+  border-radius: 0;
+  vertical-align: 3px;
+}
+.card .evo-cats,
+.card .evo-list {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  margin: 6px -16px -8px;
+}
+.card .evo-cats .list-item,
+.card .evo-list .list-item {
+  padding-left: 16px;
+  padding-right: 16px;
+}
