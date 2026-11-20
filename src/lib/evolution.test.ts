@@ -6,6 +6,7 @@ import {
   categoryMonthly,
   closedMonthIndexes,
   defaultMonth,
+  monthlyAverage,
   monthlyTotals,
   periodMonths,
   vsAverage,
@@ -70,5 +71,19 @@ describe("média", () => {
     expect(vsAverage(1200, 1000)).toEqual({ diff: 200, pct: 20 });
     expect(vsAverage(500, 1000)).toEqual({ diff: -500, pct: -50 });
     expect(vsAverage(10, 0)).toEqual({ diff: 10, pct: null });
+  });
+});
+
+describe("monthlyAverage", () => {
+  it("é a média dos 12 meses fechados, igual à soma recorrente + não recorrente da Evolução", () => {
+    const rows = [r("2026-10-05", "a", 300), r("2026-09-01", "b", 100), r("2026-11-02", "a", 999), r("2025-01-01", "a", 5000)];
+    const months = periodMonths(LAST_12, "2026-11");
+    const tot = monthlyTotals(rows, months, (id) => id === "b").map((t) => t.recurring + t.nonRecurring);
+    const expected = averageAt(tot, closedMonthIndexes(months, "2026-11", "2025-01"));
+    expect(monthlyAverage(rows, "2026-11", "2025-01")).toBe(expected);
+    expect(expected).toBe(36); // (300 + 100) / 11, mês atual fora
+  });
+  it("projeto novo: só conta a partir do primeiro mês", () => {
+    expect(monthlyAverage([r("2026-09-10", null, 1000), r("2026-10-10", null, 3000)], "2026-11", "2026-09")).toBe(2000);
   });
 });
