@@ -5,15 +5,26 @@ export const EVOLUTION_MONTHS = 12;
 
 type Row = { spentOn: string; categoryId: string | null; amountCents: number };
 
-/**
- * Meses do gráfico, do mais antigo ao mais recente. Termina no mês atual para o
- * mês escolhido ficar dentro da janela sem ela "andar" a cada toque; só se
- * desloca quando o mês escolhido cai fora dela (futuro ou mais de 11 meses atrás).
- */
-export function evolutionWindow(selected: string, current: string, n = EVOLUTION_MONTHS): string[] {
-  const outside = selected > current || selected < shiftMonth(current, -(n - 1));
-  const end = outside ? selected : current;
-  return Array.from({ length: n }, (_, i) => shiftMonth(end, i - (n - 1)));
+/** Período da aba Evolução: "12m" (últimos 12 meses, padrão) ou um ano ("2025"). */
+export type EvolutionPeriod = string;
+export const LAST_12 = "12m";
+
+/** Meses do período, do mais antigo ao mais recente: 12 terminando no mês atual, ou jan–dez do ano. */
+export function periodMonths(period: EvolutionPeriod, current: string, n = EVOLUTION_MONTHS): string[] {
+  if (period === LAST_12) return Array.from({ length: n }, (_, i) => shiftMonth(current, i - (n - 1)));
+  return Array.from({ length: 12 }, (_, i) => `${period}-${String(i + 1).padStart(2, "0")}`);
+}
+
+/** Anos com lançamento (e o atual), do mais recente ao mais antigo, para o seletor. */
+export function availableYears(monthsWithActivity: string[], current: string): string[] {
+  const ys = new Set(monthsWithActivity.map((m) => m.slice(0, 4)));
+  ys.add(current.slice(0, 4));
+  return [...ys].sort().reverse();
+}
+
+/** Mês destacado ao abrir um período: o atual se estiver nele, senão o último do período. */
+export function defaultMonth(months: string[], current: string): string {
+  return months.includes(current) ? current : months[months.length - 1];
 }
 
 export interface MonthTotals {
@@ -50,8 +61,9 @@ export function categoryMonthly(rows: Row[], months: string[], categoryId: strin
  * Índices dos meses que entram na média: só os já fechados (antes do mês atual).
  * O mês em andamento puxaria a média para baixo; lançamento futuro, idem.
  */
-export function closedMonthIndexes(months: string[], current: string): number[] {
-  return months.flatMap((m, i) => (m < current ? [i] : []));
+export function closedMonthIndexes(months: string[], current: string, firstMonth?: string): number[] {
+  // Antes do primeiro lançamento do projeto não é "mês sem gasto": fica fora da média.
+  return months.flatMap((m, i) => (m < current && (!firstMonth || m >= firstMonth) ? [i] : []));
 }
 
 /** Média em centavos inteiros dos valores nas posições dadas (0 se não houver nenhuma). */

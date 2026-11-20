@@ -17,6 +17,7 @@ import { moveItem, reorderKeys } from "@/lib/order";
 import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 import { Evolution } from "@/screens/Evolution";
+import { availableYears } from "@/lib/evolution";
 
 // key: ordem dentro do dia (maior = mais acima). Despesa usa sort_key; acerto, o instante em que foi criado.
 type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; date: string; key: number; s: Settlement };
@@ -104,7 +105,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           const start = touchStart.current;
           touchStart.current = null;
           // Arrastar para o lado troca o mês (onde há navegação por mês e fora do modo reordenar).
-          if (!start || isTrip || reordering) return;
+          if (!start || isTrip || reordering || tab === "evolucao") return;
           const t = e.changedTouches[0];
           const step = swipeStep(start, { x: t.clientX, y: t.clientY }, window.innerWidth);
           const target = step === 1 ? nextMonth : step === -1 ? prevMonth : null;
@@ -112,7 +113,30 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         }}
       >
 
-        {!isTrip && (
+
+        {/* Saldo é do projeto todo: acima das abas e do mês. */}
+        {isHome && <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />}
+        <div className="tabs-row">
+          <div className="segmented" role="tablist">
+            <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
+              Lançamentos
+            </button>
+            {/* Casa não tem Resumo: o saldo fica no topo dos lançamentos e as categorias, na Evolução. */}
+            {!isHome && (
+              <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
+                {isTrip ? "Resumo" : "Resumo do mês"}
+              </button>
+            )}
+            {isHome && (
+              <button role="tab" aria-selected={tab === "evolucao"} className={tab === "evolucao" ? "active" : ""} onClick={() => setTab("evolucao")}>
+                Evolução
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Evolução tem seletor de período próprio, sem a barra de mês. */}
+        {!isTrip && tab !== "evolucao" && (
         <nav className="month-nav">
           <button className="icon-btn" aria-label="Mês anterior" disabled={!prevMonth} onClick={() => prevMonth && setMonth(prevMonth)}>
             ‹
@@ -123,29 +147,12 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           </button>
         </nav>
         )}
-
-        <div className="tabs-row">
-          <div className="segmented" role="tablist">
-            <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
-              Lançamentos
-            </button>
-            <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
-              {isTrip ? "Resumo" : isHome ? "Resumo" : "Resumo do mês"}
-            </button>
-            {isHome && (
-              <button role="tab" aria-selected={tab === "evolucao"} className={tab === "evolucao" ? "active" : ""} onClick={() => setTab("evolucao")}>
-                Evolução
-              </button>
-            )}
-          </div>
-        </div>
-
         {tab === "evolucao" && isHome && (
           <Evolution
             projectId={id}
-            month={month}
             current={todayISO().slice(0, 7)}
-            onSelectMonth={setMonth}
+            years={availableYears(activeMonths.data ?? [], todayISO().slice(0, 7))}
+            firstMonth={activeMonths.data?.[0]}
             cats={cats}
             version={version}
           />
@@ -173,7 +180,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             }}
           />
         )}
-        {activity.data && tab === "resumo" && (
+        {activity.data && tab === "resumo" && !isHome && (
           <>
             {/* saldo é de todo o projeto (não só do mês): por isso "Saldo geral" */}
             <BalanceBanner
@@ -202,6 +209,29 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         </button>
       )}
     </>
+  );
+}
+
+/** Casa: saldo geral numa linha, acima da lista de lançamentos. */
+function BalanceStrip(props: { me: string; members: Member[]; balances: Record<string, number>; onSettle: () => void }) {
+  const { me, members, balances } = props;
+  const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
+  const t = suggestTransfers(balances).find((x) => x.from === me || x.to === me);
+  return (
+    <section className="balance-strip">
+      {t ? (
+        <>
+          <span className="grow min0">
+            {name(t.from)} deve <Money cents={t.amountCents} tone={t.to === me ? "pos" : "neg"} /> a {name(t.to)}
+          </span>
+          <button className="btn small ghost" onClick={props.onSettle}>
+            Acertar
+          </button>
+        </>
+      ) : (
+        <span className="grow">Tudo certo entre {members.map((m) => m.name).join(" e ")} ✨</span>
+      )}
+    </section>
   );
 }
 
