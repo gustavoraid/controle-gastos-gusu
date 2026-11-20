@@ -129,9 +129,12 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
               Lançamentos
             </button>
-            <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
-              {isTrip ? "Resumo" : isHome ? "Resumo" : "Resumo do mês"}
-            </button>
+            {/* Casa não tem Resumo: o saldo fica no topo dos lançamentos e as categorias, na Evolução. */}
+            {!isHome && (
+              <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
+                {isTrip ? "Resumo" : "Resumo do mês"}
+              </button>
+            )}
             {isHome && (
               <button role="tab" aria-selected={tab === "evolucao"} className={tab === "evolucao" ? "active" : ""} onClick={() => setTab("evolucao")}>
                 Evolução
@@ -152,6 +155,9 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         )}
         {tab !== "evolucao" && activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
         {tab !== "evolucao" && !activity.data && !activity.error && <Loading />}
+        {activity.data && tab === "lista" && isHome && (
+          <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
+        )}
         {activity.data && tab === "lista" && (
           <ActivityList
             me={me}
@@ -173,7 +179,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
             }}
           />
         )}
-        {activity.data && tab === "resumo" && (
+        {activity.data && tab === "resumo" && !isHome && (
           <>
             {/* saldo é de todo o projeto (não só do mês): por isso "Saldo geral" */}
             <BalanceBanner
@@ -202,6 +208,29 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         </button>
       )}
     </>
+  );
+}
+
+/** Casa: saldo geral numa linha, acima da lista de lançamentos. */
+function BalanceStrip(props: { me: string; members: Member[]; balances: Record<string, number>; onSettle: () => void }) {
+  const { me, members, balances } = props;
+  const name = (uid: string) => members.find((m) => m.userId === uid)?.name ?? "?";
+  const t = suggestTransfers(balances).find((x) => x.from === me || x.to === me);
+  return (
+    <section className="balance-strip">
+      {t ? (
+        <>
+          <span className="grow min0">
+            {name(t.from)} deve <Money cents={t.amountCents} tone={t.to === me ? "pos" : "neg"} /> a {name(t.to)}
+          </span>
+          <button className="btn small ghost" onClick={props.onSettle}>
+            Acertar
+          </button>
+        </>
+      ) : (
+        <span className="grow">Tudo certo entre {members.map((m) => m.name).join(" e ")} ✨</span>
+      )}
+    </section>
   );
 }
 
