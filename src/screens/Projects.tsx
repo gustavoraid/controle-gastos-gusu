@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { Avatar, ErrorBox, Header, Loading, Money } from "@/components/ui";
+import { ErrorBox, Header, Loading } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { go } from "@/hooks/useRoute";
-import { countUnseenActivity, listProjects, signOut } from "@/lib/api";
+import { countUnseenActivity, listProjects, listSpending, signOut } from "@/lib/api";
+import { todayISO } from "@/lib/dates";
+import { monthlyAverage } from "@/lib/evolution";
+import { formatBRL } from "@/lib/money";
+import { perDayCents } from "@/lib/trip";
 import { badgeLabel } from "@/lib/feed";
 import { getFeedSeen } from "@/lib/storage";
 import type { ProjectSummary } from "@/lib/types";
 
 export function Projects({ me }: { me: string }) {
   const { data, error, reload } = useLoad(() => listProjects(me), [me]);
+  // Médias vêm à parte: a lista aparece já, e o número entra quando chegar.
+  const spending = useLoad(() => listSpending(), [me]);
   const [showArchived, setShowArchived] = useState(false);
   const unseen = useLoad(() => countUnseenActivity(me, getFeedSeen()), [me]);
   // Voltou para o app (estava em segundo plano): atualiza o contador do sino.
@@ -35,7 +41,6 @@ export function Projects({ me }: { me: string }) {
 
   const active = data?.filter((p) => !p.archived) ?? [];
   const archived = data?.filter((p) => p.archived) ?? [];
-  const total = active.reduce((acc, p) => acc + p.myNetCents, 0);
 
   return (
     <>
@@ -60,13 +65,6 @@ export function Projects({ me }: { me: string }) {
         {!data && !error && <Loading />}
         {data && (
           <>
-            {active.length > 0 && (
-              <section className="total-card">
-                <span className="muted">Somando todos os projetos</span>
-                <BalanceLine cents={total} big />
-              </section>
-            )}
-
             {data.length === 0 && (
               <div className="empty">
                 <p className="empty-emoji">👋</p>
@@ -76,7 +74,7 @@ export function Projects({ me }: { me: string }) {
 
             <ul className="list">
               {active.map((p) => (
-                <ProjectRow key={p.id} p={p} me={me} />
+                <ProjectRow key={p.id} p={p} me={me} spending={spending.data?.get(p.id) ?? (spending.data ? [] : null)} />
               ))}
             </ul>
 
@@ -88,7 +86,7 @@ export function Projects({ me }: { me: string }) {
                 {showArchived && (
                   <ul className="list dim">
                     {archived.map((p) => (
-                      <ProjectRow key={p.id} p={p} me={me} />
+                      <ProjectRow key={p.id} p={p} me={me} spending={spending.data?.get(p.id) ?? (spending.data ? [] : null)} />
                     ))}
                   </ul>
                 )}
@@ -105,31 +103,58 @@ export function Projects({ me }: { me: string }) {
   );
 }
 
-function ProjectRow({ p, me }: { p: ProjectSummary; me: string }) {
-  const others = p.members.filter((m) => m.userId !== me);
+function ProjectRow(props: { p: ProjectSummary; me: string; spending: { spentOn: string; amountCents: number }[] | null }) {
+  const { p, me } = props;
+  const myName = p.members.find((m) => m.userId === me)?.name ?? "?";
+  const other = p.members.find((m) => m.userId !== me)?.name ?? "?";
+  // Só existem duas pessoas: "Gu deve R$ X" já diz a quem.
+  const cents = p.myNetCents;
   return (
     <li>
       <button className="list-item" onClick={() => go(`/p/${p.id}`)}>
         <span className="cat-badge big">{p.emoji}</span>
-        <span className="grow">
-          <strong>{p.name}</strong>
-          <span className="muted small row gap-sm">
-            {others.map((m) => <Avatar key={m.userId} name={m.name} size={18} />)}
-            {others.length > 0 && others.map((m) => m.name).join(", ")}
+        <span className="grow min0">
+          <strong className="ellipsis">{p.name}</strong>
+          {/* saldo em segundo plano: só uma linha discreta */}
+          <span className="muted small">
+            {cents === 0 ? "quitado" : `${cents < 0 ? myName : other} deve ${formatBRL(Math.abs(cents))}`}
           </span>
         </span>
-        <BalanceLine cents={p.myNetCents} />
+        <SpendStat p={p} rows={props.spending} />
       </button>
     </li>
   );
 }
 
-export function BalanceLine({ cents, big }: { cents: number; big?: boolean }) {
-  if (cents === 0) return <span className={`balance muted ${big ? "big" : ""}`}>quitado</span>;
+/** Número principal do projeto: média mensal (Casa/Outros) ou gasto por dia (Viagem). */
+function SpendStat({ p, rows }: { p: ProjectSummary; rows: { spentOn: string; amountCents: number }[] | null }) {
+  if (!rows) return <span className="spend-stat muted small">…</span>;
+  if (p.type === "viagem") {
+    const total = rows.reduce((acc, r) => acc + r.amountCents, 0);
+    if (p.tripDays) {
+      return (
+        <span className="spend-stat">
+          <span className="money">{formatBRL(perDayCents(total, p.tripDays))}</span>
+          {/* o total fica dentro do projeto: aqui ele espremia o nome da viagem */}
+          <span className="muted small">por dia</span>
+        </span>
+      );
+    }
+    return (
+      <span className="spend-stat">
+        <span className="money">{formatBRL(total)}</span>
+        <span className="muted small">total</span>
+      </span>
+    );
+  }
+  const first = rows.reduce<string | undefined>((m, r) => (!m || r.spentOn < m ? r.spentOn : m), undefined)?.slice(0, 7);
+  const current = todayISO().slice(0, 7);
+  const avg = monthlyAverage(rows, current, first);
+  if (!first || first >= current) return <span className="spend-stat muted small">sem média ainda</span>;
   return (
-    <span className={`balance ${big ? "big" : ""}`}>
-      <span className="small muted">{cents > 0 ? "a receber" : "a pagar"}</span>
-      <Money cents={Math.abs(cents)} tone={cents > 0 ? "pos" : "neg"} />
+    <span className="spend-stat">
+      <span className="money">{formatBRL(avg)}</span>
+      <span className="muted small">média/mês</span>
     </span>
   );
 }

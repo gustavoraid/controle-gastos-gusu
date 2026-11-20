@@ -76,3 +76,18 @@ export function averageAt(values: number[], indexes: number[]): number {
 export function vsAverage(value: number, average: number): { diff: number; pct: number | null } {
   return { diff: value - average, pct: average > 0 ? Math.round(((value - average) / average) * 100) : null };
 }
+
+/**
+ * Média mensal dos últimos 12 meses fechados (tela inicial): a mesma conta da aba
+ * Evolução em "Últimos 12 meses". firstMonth = primeiro mês com lançamento.
+ */
+export function monthlyAverage(rows: { spentOn: string; amountCents: number }[], current: string, firstMonth?: string): number {
+  const months = periodMonths(LAST_12, current);
+  const idx = new Map(months.map((m, i) => [m, i]));
+  const totals = months.map(() => 0);
+  for (const r of rows) {
+    const i = idx.get(r.spentOn.slice(0, 7));
+    if (i !== undefined) totals[i] += r.amountCents;
+  }
+  return averageAt(totals, closedMonthIndexes(months, current, firstMonth));
+}

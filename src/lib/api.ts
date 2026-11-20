@@ -127,6 +127,28 @@ export async function listProjects(me: string): Promise<ProjectSummary[]> {
   }));
 }
 
+/**
+ * Gasto de cada projeto em reais (só data e valor), para as médias da tela inicial.
+ * Valor pela cotação atual do projeto, como no resto do app.
+ */
+export async function listSpending(): Promise<Map<string, { spentOn: string; amountCents: number }[]>> {
+  const cur = check<any[]>(await supabase.from("project_currencies").select("project_id, code, rate"));
+  const byProject = new Map<string, any[]>();
+  for (const c of cur) byProject.set(c.project_id, [...(byProject.get(c.project_id) ?? []), c]);
+  const rates = new Map([...byProject].map(([pid, rows]) => [pid, ratesOf(mapCurrencies(rows))]));
+  const rows = await fetchAll<any>((from, to) =>
+    supabase.from("expenses").select("id, project_id, amount, currency, spent_on").order("id").range(from, to),
+  );
+  const out = new Map<string, { spentOn: string; amountCents: number }[]>();
+  for (const r of rows) {
+    const rt = rates.get(r.project_id) ?? {};
+    const list = out.get(r.project_id) ?? [];
+    list.push({ spentOn: r.spent_on, amountCents: toBrlCents(Number(r.amount), r.currency, rt[r.currency] ?? 0) });
+    out.set(r.project_id, list);
+  }
+  return out;
+}
+
 export async function getProject(id: string) {
   const r = check<any>(
     await supabase
