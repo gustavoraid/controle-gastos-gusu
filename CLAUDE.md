@@ -61,8 +61,11 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
   `shortName()` (`src/lib/people.ts`, duas primeiras letras do `display_name`) aplicado no
   mapeamento dos perfis em `api.ts`. Cores fixas por ordem dos membros: `PERSON_COLORS` (azul / rosa).
 - Por tipo de projeto (`src/screens/Project.tsx`):
-  - Casa: navegação por mês pulando meses vazios, lista sem agrupar por dia, sem reordenar,
-    Resumo separa categorias "não recorrentes" (`categories.non_recurring`, `splitByRecurrence`).
+  - Casa: abas `Lançamentos | Evolução` (sem Resumo); saldo + Acertar numa faixa acima das abas.
+    Lançamentos: mês pulando meses vazios, sem agrupar por dia, sem reordenar. Evolução
+    (`src/screens/Evolution.tsx`, `src/lib/evolution.ts`): seletor de período (últimos 12 meses /
+    anos), recorrente × não recorrente (`categories.non_recurring`), média dos meses fechados a
+    partir do 1º lançamento, chips de categoria ("Todas" padrão). Mês da Evolução é só dela.
   - Viagem: sem navegação por mês, "⇅ Reordenar" no cabeçalho de cada dia (o modo vale para todos
     os dias, um Concluir só), Resumo com gasto por dia (`projects.trip_days`, sempre total ÷ dias).
   - Outros: navegação por mês + reordenar como viagem.
@@ -76,8 +79,30 @@ e não deixa criar projeto antes das duas existirem). Todo projeto inclui as dua
   reordenar não conta). O sino da tela inicial conta ações da outra pessoa desde a última visita.
 - Lançamento: valor + chip Gu/Su (um toque alterna) → Quando → Categoria (recolhe ao escolher) →
   Descrição (só depois da categoria, sugestões antes do campo livre).
-- Abrir o app sem rota vai para o último projeto (`launchRoute`). `#/add/casa` lança direto no
-  primeiro projeto Casa ativo.
+- Tela inicial: por projeto, média/mês (Casa/Outros, mesma conta da Evolução — `monthlyAverage`)
+  ou gasto por dia (Viagem); saldo só como linha discreta. Abaixo, a seção Listas.
+- Abrir o app sem rota vai para o último projeto OU lista aberto (`launchRoute`, `gc:ultimoLugar`).
+  `#/add/casa` lança direto no primeiro projeto Casa ativo.
+
+## Listas compartilhadas (compras, tarefas)
+
+- Entidade própria (`lists`, `list_items`, migration `0007`), não é tipo de projeto: sem divisão,
+  moeda nem saldo. RLS `is_app_user()` (tem perfil = é uma das duas contas). Rotas `#/l/:id`,
+  `#/l/:id/config`, `#/nova-lista`.
+- Item novo entra no FIM (`newItemKey`); arrastar pela alça ≡ sempre ligado (sort_key maior = mais
+  acima, `reorderKeys`). Concluir desce para "Concluídos" (recolhido, com quem/quando, "Desfazer");
+  desmarcar volta à posição antiga. "Limpar concluídos" apaga.
+- Sinal ruim é requisito: toda mudança passa por `src/lib/listQueue.ts` (fila no `localStorage`,
+  operações idempotentes com id gerado no celular) e aparece na hora via `applyOps`. Tempo real:
+  exclusões escutadas sem filtro (o filtro não entrega DELETE).
+- Ideias aprovadas para uma v2 (não implementar sem o dono pedir):
+  - A. Responsável por item (chip Gu/Su, um toque alterna) — para tarefas.
+  - B. Sugestões ao digitar com itens já concluídos daquela lista.
+  - C. "Lançar despesa" a partir da lista (abre Nova despesa na Casa com "Mercado").
+  - D. Tarefas recorrentes (volta a ficar pendente N dias depois de concluída).
+  - E. Prazo nos itens.
+  - F. Seções dentro da lista (o dono achou que a ordem livre resolve; só se pedir).
+  - G. Listas no sino de atividades (risco de virar ruído no mercado).
 
 ## PWA, ícones e atalhos
 

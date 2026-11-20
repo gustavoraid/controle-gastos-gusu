@@ -1351,3 +1351,122 @@ li.dragging {
 .spend-stat .money {
   font-size: 17px;
 }
+
+.toast.with-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 8px;
+}
+.toast-action {
+  border: 0;
+  background: transparent;
+  color: var(--brand-soft);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ listas compartilhadas */
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 8px 4px -4px;
+}
+.section-title:first-child {
+  margin-top: 0;
+}
+.add-item {
+  display: flex;
+  gap: 8px;
+}
+.add-item input {
+  flex: 1;
+}
+.add-item .btn {
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+.sync-note {
+  margin: 0;
+  color: var(--muted);
+}
+.sync-note.offline {
+  color: var(--neg);
+  font-weight: 600;
+}
+.item-row {
+  gap: 6px;
+  padding-right: 4px;
+}
+.check {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: 0 6px 0 2px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.check.on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.item-text {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: text;
+}
+.item-label {
+  overflow-wrap: anywhere;
+}
+.item-row.is-done .item-label {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.item-edit input {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+.done-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.done-toggle {
+  padding-left: 4px;
+  font-weight: 650;
+}
+.danger-link {
+  color: var(--danger);
+}
+.small-empty {
+  padding: 20px 16px;
+}
+.toast.with-action > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}

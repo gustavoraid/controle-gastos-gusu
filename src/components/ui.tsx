@@ -70,30 +70,44 @@ export function Chip(props: { active?: boolean; onClick: () => void; children: R
 
 // ---------------------------------------------------------------- toast
 
-let push: ((msg: string, kind: "ok" | "err") => void) | null = null;
+type ToastAction = { label: string; run: () => void };
+let push: ((msg: string, kind: "ok" | "err", action?: ToastAction) => void) | null = null;
 
 export const toast = {
-  ok: (msg: string) => push?.(msg, "ok"),
+  /** `action`: botão no aviso (ex.: "Desfazer"); o aviso fica mais tempo na tela. */
+  ok: (msg: string, action?: ToastAction) => push?.(msg, "ok", action),
   err: (msg: string) => push?.(msg, "err"),
 };
 
 export function ToastHost() {
-  const [item, setItem] = useState<{ msg: string; kind: "ok" | "err"; key: number } | null>(null);
+  const [item, setItem] = useState<{ msg: string; kind: "ok" | "err"; key: number; action?: ToastAction } | null>(null);
   useEffect(() => {
-    push = (msg, kind) => setItem({ msg, kind, key: Date.now() });
+    push = (msg, kind, action) => setItem({ msg, kind, key: Date.now(), action });
     return () => {
       push = null;
     };
   }, []);
   useEffect(() => {
     if (!item) return;
-    const t = setTimeout(() => setItem(null), item.kind === "err" ? 4500 : 2200);
+    const t = setTimeout(() => setItem(null), item.action ? 5000 : item.kind === "err" ? 4500 : 2200);
     return () => clearTimeout(t);
   }, [item]);
   if (!item) return null;
   return (
-    <div key={item.key} className={`toast ${item.kind}`} role="status">
-      {item.msg}
+    <div key={item.key} className={`toast ${item.kind}${item.action ? " with-action" : ""}`} role="status">
+      <span>{item.msg}</span>
+      {item.action && (
+        <button
+          type="button"
+          className="toast-action"
+          onClick={() => {
+            item.action!.run();
+            setItem(null);
+          }}
+        >
+          {item.action.label}
+        </button>
+      )}
     </div>
   );
 }

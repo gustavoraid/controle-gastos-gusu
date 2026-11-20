@@ -1,13 +1,13 @@
 import type { ProjectType } from "@/lib/types";
 
 /**
- * Para onde ir ao abrir o app: na tela inicial (sem rota), direto para o
- * último projeto aberto neste aparelho. Qualquer outra rota é respeitada
- * (atalhos, links). null = fica onde está.
+ * Para onde ir ao abrir o app: na tela inicial (sem rota), direto para o último
+ * lugar aberto neste aparelho — projeto (`/p/:id`) ou lista (`/l/:id`). Qualquer
+ * outra rota é respeitada (atalhos, links). null = fica onde está.
  */
-export function launchRoute(hash: string, lastProject: string | null): string | null {
+export function launchRoute(hash: string, lastPlace: string | null): string | null {
   const path = hash.replace(/^#/, "");
-  if ((path === "" || path === "/") && lastProject) return `/p/${lastProject}`;
+  if ((path === "" || path === "/") && lastPlace && /^\/(p|l)\/[^/]+$/.test(lastPlace)) return lastPlace;
   return null;
 }
 

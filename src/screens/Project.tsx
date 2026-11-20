@@ -14,7 +14,7 @@ import { splitByRecurrence, type CategoryGroup } from "@/lib/summary";
 import { swipeStep } from "@/lib/swipe";
 import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
-import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
+import { getViewMonth, setLastPlace, setLastProject, setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 import { Evolution } from "@/screens/Evolution";
 import { availableYears } from "@/lib/evolution";
@@ -51,7 +51,10 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
     setVersion((v) => v + 1);
   };
 
-  useEffect(() => setLastProject(id), [id]);
+  useEffect(() => {
+    setLastProject(id);
+    setLastPlace(`/p/${id}`);
+  }, [id]);
 
   const data = proj.data;
   const names = useMemo(() => new Map(data?.members.map((m) => [m.userId, m.name]) ?? []), [data]);
