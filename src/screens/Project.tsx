@@ -16,6 +16,7 @@ import { perDayCents } from "@/lib/trip";
 import { moveItem, reorderKeys } from "@/lib/order";
 import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
+import { Evolution } from "@/screens/Evolution";
 
 // key: ordem dentro do dia (maior = mais acima). Despesa usa sort_key; acerto, o instante em que foi criado.
 type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; date: string; key: number; s: Settlement };
@@ -26,7 +27,9 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
     setMonthState(m);
     setViewMonth(id, m);
   };
-  const [tab, setTab] = useState<"lista" | "resumo">("lista");
+  const [tab, setTab] = useState<"lista" | "resumo" | "evolucao">("lista");
+  // Muda a cada recarga dos lançamentos: a aba Evolução busca a própria janela de 12 meses.
+  const [version, setVersion] = useState(0);
   const [reordering, setReordering] = useState(false);
   const reloadActivity = useRef<() => void>(undefined);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -44,6 +47,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
   reloadActivity.current = () => {
     activity.reload();
     activeMonths.reload();
+    setVersion((v) => v + 1);
   };
 
   useEffect(() => setLastProject(id), [id]);
@@ -126,13 +130,28 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
               Lançamentos
             </button>
             <button role="tab" aria-selected={tab === "resumo"} className={tab === "resumo" ? "active" : ""} onClick={() => setTab("resumo")} disabled={reordering}>
-              {isTrip ? "Resumo" : "Resumo do mês"}
+              {isTrip ? "Resumo" : isHome ? "Resumo" : "Resumo do mês"}
             </button>
+            {isHome && (
+              <button role="tab" aria-selected={tab === "evolucao"} className={tab === "evolucao" ? "active" : ""} onClick={() => setTab("evolucao")}>
+                Evolução
+              </button>
+            )}
           </div>
         </div>
 
-        {activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
-        {!activity.data && !activity.error && <Loading />}
+        {tab === "evolucao" && isHome && (
+          <Evolution
+            projectId={id}
+            month={month}
+            current={todayISO().slice(0, 7)}
+            onSelectMonth={setMonth}
+            cats={cats}
+            version={version}
+          />
+        )}
+        {tab !== "evolucao" && activity.error && <ErrorBox message={activity.error} onRetry={activity.reload} />}
+        {tab !== "evolucao" && !activity.data && !activity.error && <Loading />}
         {activity.data && tab === "lista" && (
           <ActivityList
             me={me}
