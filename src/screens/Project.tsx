@@ -17,6 +17,7 @@ import { moveItem, reorderKeys } from "@/lib/order";
 import { getViewMonth, setLastProject, setViewMonth } from "@/lib/storage";
 import type { Category, Expense, Member, Settlement } from "@/lib/types";
 import { Evolution } from "@/screens/Evolution";
+import { availableYears } from "@/lib/evolution";
 
 // key: ordem dentro do dia (maior = mais acima). Despesa usa sort_key; acerto, o instante em que foi criado.
 type Item = { kind: "e"; date: string; key: number; e: Expense } | { kind: "s"; date: string; key: number; s: Settlement };
@@ -104,7 +105,7 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           const start = touchStart.current;
           touchStart.current = null;
           // Arrastar para o lado troca o mês (onde há navegação por mês e fora do modo reordenar).
-          if (!start || isTrip || reordering) return;
+          if (!start || isTrip || reordering || tab === "evolucao") return;
           const t = e.changedTouches[0];
           const step = swipeStep(start, { x: t.clientX, y: t.clientY }, window.innerWidth);
           const target = step === 1 ? nextMonth : step === -1 ? prevMonth : null;
@@ -113,6 +114,8 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
       >
 
 
+        {/* Saldo é do projeto todo: acima das abas e do mês. */}
+        {isHome && <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />}
         <div className="tabs-row">
           <div className="segmented" role="tablist">
             <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "active" : ""} onClick={() => setTab("lista")} disabled={reordering}>
@@ -132,11 +135,8 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
           </div>
         </div>
 
-        {/* Saldo é do projeto todo: fica acima do mês. */}
-        {tab === "lista" && isHome && (
-          <BalanceStrip me={me} members={members} balances={balances} onSettle={() => go(`/p/${id}/acertar`)} />
-        )}
-        {!isTrip && (
+        {/* Evolução tem seletor de período próprio, sem a barra de mês. */}
+        {!isTrip && tab !== "evolucao" && (
         <nav className="month-nav">
           <button className="icon-btn" aria-label="Mês anterior" disabled={!prevMonth} onClick={() => prevMonth && setMonth(prevMonth)}>
             ‹
@@ -150,9 +150,9 @@ export function ProjectScreen({ id, me }: { id: string; me: string }) {
         {tab === "evolucao" && isHome && (
           <Evolution
             projectId={id}
-            month={month}
             current={todayISO().slice(0, 7)}
-            onSelectMonth={setMonth}
+            years={availableYears(activeMonths.data ?? [], todayISO().slice(0, 7))}
+            firstMonth={activeMonths.data?.[0]}
             cats={cats}
             version={version}
           />

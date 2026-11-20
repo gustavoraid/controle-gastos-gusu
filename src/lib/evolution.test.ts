@@ -1,21 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { averageAt, categoryMonthly, closedMonthIndexes, evolutionWindow, monthlyTotals, vsAverage } from "./evolution";
+import {
+  LAST_12,
+  availableYears,
+  averageAt,
+  categoryMonthly,
+  closedMonthIndexes,
+  defaultMonth,
+  monthlyTotals,
+  periodMonths,
+  vsAverage,
+} from "./evolution";
 
 const r = (spentOn: string, categoryId: string | null, amountCents: number) => ({ spentOn, categoryId, amountCents });
 
-describe("evolutionWindow", () => {
-  it("termina no mês atual quando o escolhido está dentro dos 12 meses", () => {
-    const w = evolutionWindow("2026-03", "2026-11");
+describe("periodMonths", () => {
+  it("últimos 12 meses terminam no mês atual", () => {
+    const w = periodMonths(LAST_12, "2026-11");
     expect(w).toHaveLength(12);
     expect(w[0]).toBe("2025-12");
     expect(w[11]).toBe("2026-11");
-    expect(evolutionWindow("2025-12", "2026-11")[0]).toBe("2025-12");
   });
-  it("desloca para terminar no escolhido quando ele cai fora (futuro ou antigo)", () => {
-    expect(evolutionWindow("2026-12", "2026-11").slice(-2)).toEqual(["2026-11", "2026-12"]);
-    const old = evolutionWindow("2025-11", "2026-11");
-    expect(old[0]).toBe("2024-12");
-    expect(old[11]).toBe("2025-11");
+  it("um ano vai de janeiro a dezembro", () => {
+    const w = periodMonths("2025", "2026-11");
+    expect(w[0]).toBe("2025-01");
+    expect(w[11]).toBe("2025-12");
+  });
+});
+
+describe("availableYears / defaultMonth", () => {
+  it("anos com lançamento mais o atual, do mais recente ao mais antigo", () => {
+    expect(availableYears(["2023-08", "2024-01", "2025-12"], "2026-11")).toEqual(["2026", "2025", "2024", "2023"]);
+  });
+  it("destaca o mês atual se estiver no período, senão o último", () => {
+    expect(defaultMonth(periodMonths("2026", "2026-11"), "2026-11")).toBe("2026-11");
+    expect(defaultMonth(periodMonths("2025", "2026-11"), "2026-11")).toBe("2025-12");
   });
 });
 
@@ -45,6 +63,8 @@ describe("média", () => {
     expect(idx).toEqual([0, 1]);
     expect(averageAt([100, 201, 5, 999], idx)).toBe(151);
     expect(averageAt([1, 2], [])).toBe(0);
+    // meses antes do primeiro lançamento do projeto não entram
+    expect(closedMonthIndexes(["2023-07", "2023-08", "2023-09"], "2026-11", "2023-08")).toEqual([1, 2]);
   });
   it("vsAverage dá a diferença e o percentual, sem percentual com média zero", () => {
     expect(vsAverage(1200, 1000)).toEqual({ diff: 200, pct: 20 });

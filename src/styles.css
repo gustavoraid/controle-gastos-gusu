@@ -1302,3 +1302,35 @@ li.dragging {
   margin-bottom: 2px;
   font-weight: 600;
 }
+.evo-period {
+  width: auto;
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-weight: 650;
+  font-size: 15px;
+  color: var(--text);
+}
+.evo-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 2px 16px;
+  position: relative;
+}
+.evo-chips::-webkit-scrollbar {
+  display: none;
+}
+.evo-chips .chip {
+  flex: none;
+  white-space: nowrap;
+}
+/* "‹ Todas" fica preso à esquerda enquanto a faixa de categorias rola */
+.evo-chips .chip.back {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 8px 0 8px -4px var(--bg);
+}

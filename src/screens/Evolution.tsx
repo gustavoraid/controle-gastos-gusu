@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ErrorBox, Loading } from "@/components/ui";
 import { useLoad } from "@/hooks/useLoad";
 import { go } from "@/hooks/useRoute";
@@ -9,8 +9,10 @@ import {
   averageAt,
   categoryMonthly,
   closedMonthIndexes,
-  evolutionWindow,
+  defaultMonth,
+  LAST_12,
   monthlyTotals,
+  periodMonths,
   vsAverage,
 } from "@/lib/evolution";
 import { formatBRL } from "@/lib/money";
@@ -27,16 +29,30 @@ const shortMonth = (ym: string) => shortMonthFmt.format(new Date(`${ym}-01T12:00
  */
 export function Evolution(props: {
   projectId: string;
-  month: string;
   current: string;
-  onSelectMonth: (m: string) => void;
+  /** Anos com lançamento (mais recente primeiro), para o seletor de período. */
+  years: string[];
+  /** Primeiro mês com lançamento no projeto ("YYYY-MM"): antes dele não entra na média. */
+  firstMonth?: string;
   cats: Map<string, Category>;
   /** Muda quando os lançamentos mudam (tempo real / edição) para buscar de novo. */
   version: number;
 }) {
-  const { projectId, month, current, cats } = props;
+  const { projectId, current, cats } = props;
   const [catId, setCatId] = useState<string | null>(null);
-  const months = evolutionWindow(month, current);
+  // Período e mês destacado são só desta aba (não mexem no mês da lista de lançamentos).
+  const [period, setPeriod] = useState(LAST_12);
+  const months = periodMonths(period, current);
+  const [picked, setPicked] = useState<string | null>(null);
+  const month = picked && months.includes(picked) ? picked : defaultMonth(months, current);
+  const selectMonth = (i: number) => setPicked(months[i]);
+  // Ao trocar de categoria, o chip escolhido fica visível na faixa (rolagem lateral).
+  const chipsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = chipsRef.current?.querySelector<HTMLElement>(".chip.active");
+    const box = chipsRef.current;
+    if (el && box) box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.clientWidth) / 2, behavior: "smooth" });
+  }, [catId]);
   const first = months[0];
   const last = months[months.length - 1];
   const load = useLoad(
@@ -49,9 +65,29 @@ export function Evolution(props: {
   const view = useMemo(() => {
     if (!expenses) return null;
     const totals = monthlyTotals(expenses, months, isNonRec);
-    const closed = closedMonthIndexes(months, current);
+    const closed = closedMonthIndexes(months, current, props.firstMonth);
     return { totals, closed };
-  }, [expenses, first, cats, current]);
+  }, [expenses, first, cats, current, props.firstMonth]);
+
+  const periodLabel = period === LAST_12 ? "Últimos 12 meses" : period;
+  const picker = (
+    <select
+      className="evo-period"
+      value={period}
+      aria-label="Período"
+      onChange={(e) => {
+        setPeriod(e.target.value);
+        setPicked(null);
+      }}
+    >
+      <option value={LAST_12}>Últimos 12 meses</option>
+      {props.years.map((y) => (
+        <option key={y} value={y}>
+          {y}
+        </option>
+      ))}
+    </select>
+  );
 
   if (load.error) return <ErrorBox message={load.error} onRetry={load.reload} />;
   if (!expenses || !view) return <Loading />;
@@ -64,11 +100,39 @@ export function Evolution(props: {
     const values = categoryMonthly(expenses, months, catId);
     const avg = averageAt(values, view.closed);
     const list = expenses.filter((e) => (e.categoryId ?? "") === catId && e.spentOn.startsWith(month));
+    // Troca de categoria sem voltar: chips com as categorias do período, da maior para a menor.
+    const inPeriod = new Set(months);
+    const sums = new Map<string, number>();
+    for (const e of expenses) {
+      if (!inPeriod.has(e.spentOn.slice(0, 7))) continue;
+      const k = e.categoryId ?? "";
+      sums.set(k, (sums.get(k) ?? 0) + e.amountCents);
+    }
+    if (!sums.has(catId)) sums.set(catId, 0);
+    const chips = [...sums.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
     return (
       <div className="stack">
-        <button type="button" className="btn link small evo-back" onClick={() => setCatId(null)}>
-          ‹ Todas as categorias
-        </button>
+        {picker}
+        <div className="evo-chips" role="tablist" aria-label="Categoria" ref={chipsRef}>
+          <button type="button" className="chip back" onClick={() => setCatId(null)}>
+            ‹ Todas
+          </button>
+          {chips.map((id) => {
+            const k = cats.get(id);
+            return (
+              <button
+                key={id || "none"}
+                type="button"
+                role="tab"
+                aria-selected={id === catId}
+                className={`chip${id === catId ? " active" : ""}`}
+                onClick={() => setCatId(id)}
+              >
+                {k?.emoji ?? "📦"} {k?.name ?? "Sem categoria"}
+              </button>
+            );
+          })}
+        </div>
         <section className="card">
           <h2 className="card-title">
             {c?.emoji ?? "📦"} {c?.name ?? "Sem categoria"}
@@ -78,7 +142,7 @@ export function Evolution(props: {
             selected={sel}
             stacks={values.map((v) => [v, 0])}
             average={avg}
-            onSelect={(i) => props.onSelectMonth(months[i])}
+            onSelect={selectMonth}
           />
           <Compare label={monthLabel(month)} value={values[sel]} average={avg} inProgress={inProgress} big />
         </section>
@@ -123,8 +187,9 @@ export function Evolution(props: {
 
   return (
     <div className="stack">
+      {picker}
       <section className="card">
-        <h2 className="card-title">Últimos 12 meses</h2>
+        <h2 className="card-title">{periodLabel}</h2>
         <div className="evo-legend small">
           <span>
             <i className="sw rec" /> Recorrentes
@@ -141,10 +206,10 @@ export function Evolution(props: {
           selected={sel}
           stacks={view.totals.map((x) => [x.recurring, x.nonRecurring])}
           average={avgTotal}
-          onSelect={(i) => props.onSelectMonth(months[i])}
+          onSelect={selectMonth}
         />
         <p className="muted small evo-note">
-          Média dos {view.closed.length} meses fechados. Toque numa barra para ver o mês.
+          {view.closed.length > 0 ? `Média dos ${view.closed.length} meses fechados. ` : ""}Toque numa barra para ver o mês.
         </p>
       </section>
 
